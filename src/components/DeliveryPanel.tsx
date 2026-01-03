@@ -1,60 +1,61 @@
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Badge } from "./ui/badge.tsx";
-import { Package, MapPin } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Badge } from './ui/badge';
+import { Package, MapPin } from 'lucide-react';
 
 interface DeliveryItem {
   productId: string;
   order: string;
   destination: string;
-  status: "pending" | "in-transit" | "delivered";
+  status: 'pending' | 'in-transit' | 'delivered';
 }
 
 interface DeliveryPanelProps {
   isConnected: boolean;
+  controlMode?: 'manual' | 'autonomous'; // Made optional as it's no longer critical
 }
 
-export function DeliveryPanel({ isConnected }: DeliveryPanelProps) {
+export function DeliveryPanel({ isConnected, controlMode }: DeliveryPanelProps) {
   // Mock delivery data
   const deliveries: DeliveryItem[] = [
     {
-      productId: "PKG-2501",
-      order: "ORD-4891",
-      destination: "Room A-204",
-      status: "in-transit",
+      productId: 'PKG-2501',
+      order: 'ORD-4891',
+      destination: 'Room A-204',
+      status: 'in-transit'
     },
     {
-      productId: "PKG-2502",
-      order: "ORD-4892",
-      destination: "Room B-112",
-      status: "pending",
+      productId: 'PKG-2502',
+      order: 'ORD-4892',
+      destination: 'Room B-112',
+      status: 'pending'
     },
     {
-      productId: "PKG-2503",
-      order: "ORD-4893",
-      destination: "Room C-305",
-      status: "pending",
+      productId: 'PKG-2503',
+      order: 'ORD-4893',
+      destination: 'Room C-305',
+      status: 'pending'
     },
   ];
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "in-transit":
-        return "bg-blue-600";
-      case "delivered":
-        return "bg-green-600";
+      case 'in-transit':
+        return 'bg-blue-600';
+      case 'delivered':
+        return 'bg-green-600';
       default:
-        return "bg-slate-600";
+        return 'bg-slate-600';
     }
   };
 
   const getStatusText = (status: string) => {
     switch (status) {
-      case "in-transit":
-        return "In Transit";
-      case "delivered":
-        return "Delivered";
+      case 'in-transit':
+        return 'In Transit';
+      case 'delivered':
+        return 'Delivered';
       default:
-        return "Pending";
+        return 'Pending';
     }
   };
 
@@ -74,7 +75,7 @@ export function DeliveryPanel({ isConnected }: DeliveryPanelProps) {
           </div>
         ) : (
           <div className="space-y-3">
-            {deliveries.map((delivery) => (
+            {deliveries.map((delivery, index) => (
               <div
                 key={delivery.productId}
                 className="p-3 bg-slate-800/50 border border-slate-700 rounded-lg hover:bg-slate-800/70 transition-colors"
@@ -82,17 +83,13 @@ export function DeliveryPanel({ isConnected }: DeliveryPanelProps) {
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <Package className="w-4 h-4 text-blue-400" />
-                    <span className="text-sm text-slate-300">
-                      {delivery.productId}
-                    </span>
+                    <span className="text-sm text-slate-300">{delivery.productId}</span>
                   </div>
-                  <Badge
-                    className={`text-xs ${getStatusColor(delivery.status)}`}
-                  >
+                  <Badge className={`text-xs ${getStatusColor(delivery.status)}`}>
                     {getStatusText(delivery.status)}
                   </Badge>
                 </div>
-
+                
                 <div className="space-y-1.5 text-xs">
                   <div className="flex items-center gap-2 text-slate-400">
                     <span className="text-slate-500">Order:</span>
@@ -100,9 +97,7 @@ export function DeliveryPanel({ isConnected }: DeliveryPanelProps) {
                   </div>
                   <div className="flex items-center gap-2 text-slate-400">
                     <MapPin className="w-3 h-3" />
-                    <span className="text-slate-300">
-                      {delivery.destination}
-                    </span>
+                    <span className="text-slate-300">{delivery.destination}</span>
                   </div>
                 </div>
               </div>

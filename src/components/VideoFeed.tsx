@@ -6,24 +6,21 @@ interface VideoFeedProps {
 }
 
 export function VideoFeed({ isConnected }: VideoFeedProps) {
-  const [streamError, setStreamError] = useState(false);
+  const [streamError] = useState(false);
 
   return (
     <div className="relative w-full aspect-video bg-slate-900 rounded-lg overflow-hidden border-2 border-slate-700">
       {isConnected && !streamError ? (
         <>
-          <div className="w-full h-full relative">
-            <img
-              src="https://images.unsplash.com/photo-1689620171362-c2bec67472d0?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&q=80&w=1080"
-              alt="Robot camera feed"
-              className="w-full h-full object-cover brightness-125"
-              onError={() => setStreamError(true)}
-            />
-          </div>
+          <div className="w-full h-full bg-slate-800" />
+          
+          {/* Recording indicator */}
           <div className="absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 bg-red-500/90 backdrop-blur-sm rounded-full z-10">
             <div className="w-2 h-2 bg-white rounded-full animate-pulse" />
             <span className="text-white text-xs">LIVE</span>
           </div>
+
+          {/* Stream info overlay */}
           <div className="absolute bottom-3 left-3 px-3 py-1.5 bg-black/60 backdrop-blur-sm rounded text-xs text-white z-10">
             ESP32-CAM • 640x480 • 15fps
           </div>
