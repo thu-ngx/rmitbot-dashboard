@@ -1,12 +1,13 @@
 import type { TwistStampedMessage } from "@/types";
 import * as ROSLIB from "roslib";
+import { ROS_CONFIG } from "@/config";
 
 class RosService {
   private static instance: RosService;
   ros: ROSLIB.Ros;
   isConnected: boolean = false;
-  url: string = "ws://100.68.218.48:9090";
-  reconnectInterval: number = 3000;
+  url: string = ROS_CONFIG.UBUNTU_WS_URL;
+  reconnectInterval: number = ROS_CONFIG.RECONNECT_INTERVAL;
   private isIntentionalDisconnect: boolean = false;
 
   private cmdVelPublisher: ROSLIB.Topic<TwistStampedMessage> | null = null;
