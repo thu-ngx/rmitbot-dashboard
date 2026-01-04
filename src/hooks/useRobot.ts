@@ -1,11 +1,12 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { toast } from 'sonner';
-import type { RobotState, OperationMode } from '../types';
-import { useRos } from './useRos'; 
+import type { RobotState, OperationMode, SpeedMode } from '../types';
+import { useRos } from './useRos';
+import { rosService } from '../services/ros2Connection'; 
 
 export function useRobot() {
   const { status, isConnected, connect, disconnect } = useRos();
-
+  
   const [state, setState] = useState<Omit<RobotState, 'isConnected'>>({
     batteryLevel: 78,
     speed: 0,
@@ -14,48 +15,108 @@ export function useRobot() {
     isNavigating: false,
   });
 
-  const toggleConnection = () => {
-    if (isConnected) {
-      disconnect();
-      toast.info("Disconnecting from robot...");
-    } else {
-      connect();
+  // --- REFS ---
+  const cmdVelRef = useRef({ x: 0, y: 0, z: 0 }); 
+  const lastInputRef = useRef({ x: 0, y: 0, z: 0 });
+  const speedModeRef = useRef<SpeedMode>('normal'); 
+
+  // --- HELPERS ---
+  const getSpeedMultiplier = () => {
+    switch (speedModeRef.current) {
+      case 'eco': return 0.3;
+      case 'normal': return 0.6;
+      case 'fast': return 1.0;
+      default: return 0.6;
     }
   };
 
+  // --- ACTIONS ---
+
+  const toggleConnection = () => isConnected ? disconnect() : connect();
+
   const setMode = (mode: OperationMode) => {
     if (!isConnected) return toast.error("Robot not connected");
-    setState(prev => ({ ...prev, mode, isNavigating: false }));
-    toast.info(`Switched to ${mode === 'manual' ? 'Manual' : 'Autonomous'} Mode`);
+    setState(prev => ({ ...prev, mode }));
+    
+    cmdVelRef.current = { x: 0, y: 0, z: 0 }; 
+    lastInputRef.current = { x: 0, y: 0, z: 0 };
   };
 
-  const setNavigating = (isNavigating: boolean) => {
-    setState(prev => ({ ...prev, isNavigating }));
+  const setNavigating = (isNavigating: boolean) => setState(prev => ({ ...prev, isNavigating }));
+
+  // Set speed mode (Eco/Normal/Fast)
+  const setSpeedMode = (mode: SpeedMode) => {
+    speedModeRef.current = mode;
+    
+    // Immediate update if we are moving
+    if (state.mode === 'manual') {
+        const multiplier = getSpeedMultiplier();
+        const { x, y, z } = lastInputRef.current;
+
+        cmdVelRef.current = { 
+            x: x * multiplier, 
+            y: y * multiplier,
+            z: z * multiplier 
+        };
+        
+        const currentSpeed = Math.sqrt(Math.pow(x * multiplier, 2) + Math.pow(y * multiplier, 2));
+        setState(prev => ({ ...prev, speed: currentSpeed }));
+    }
   };
 
-  useEffect(() => {
-    if (status === 'CONNECTED') toast.success("Connected to Robot");
-    if (status === 'ERROR') toast.error("Connection Error");
-  }, [status]);
+  // --- THE MOVE FUNCTION ---
+  // x (forward), y (strafe), z (turn)
+  const move = useCallback((x: number, y: number, z: number) => {
+    if (state.mode === 'autonomous') return; 
+    
+    lastInputRef.current = { x, y, z };
+    const multiplier = getSpeedMultiplier();
+    
+    cmdVelRef.current = { 
+      x: x * multiplier, 
+      y: y * multiplier,
+      z: z * multiplier 
+    };
+    
+    const currentSpeed = Math.sqrt(Math.pow(x * multiplier, 2) + Math.pow(y * multiplier, 2));
+    setState(prev => ({ ...prev, speed: currentSpeed }));
+  }, [state.mode]);
 
+  // --- LOOPS ---
+
+  // 10Hz Control Loop
   useEffect(() => {
     if (!isConnected) return;
     const interval = setInterval(() => {
+      rosService.publishVelocity(
+        cmdVelRef.current.x,
+        cmdVelRef.current.y, 
+        cmdVelRef.current.z
+      );
+    }, 100); 
+    return () => clearInterval(interval);
+  }, [isConnected]);
+
+  // Battery Simulation
+  useEffect(() => {
+    if (!isConnected) return;
+    const simInterval = setInterval(() => {
       setState(prev => ({
         ...prev,
-        batteryLevel: Math.max(0, prev.batteryLevel - 0.05),
-        speed: prev.isNavigating || prev.speed > 0 ? prev.speed + (Math.random() - 0.5) * 0.1 : 0
+        batteryLevel: Math.max(0, prev.batteryLevel - 0.01),
       }));
     }, 1000);
-    return () => clearInterval(interval);
-  }, [isConnected, state.isNavigating]);
+    return () => clearInterval(simInterval);
+  }, [isConnected]);
 
   return {
     ...state,
-    isConnected, 
-    status,      
+    isConnected,
+    status,
     toggleConnection,
     setMode,
     setNavigating,
+    move,
+    setSpeedMode
   };
 }

@@ -17,9 +17,17 @@ export function useRos() {
     ros.on("close", handleClose);
     ros.on("error", handleError);
 
-    if (ros.isConnected) {
+    if (rosService.isConnected || ros.isConnected) {
       handleConnect();
+    } else {
+      rosService.connect();
     }
+
+    return () => {
+      ros.off("connection", handleConnect);
+      ros.off("close", handleClose);
+      ros.off("error", handleError);
+    };
   }, []);
 
   // Wrapper actions

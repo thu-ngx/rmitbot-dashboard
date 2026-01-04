@@ -43,16 +43,47 @@ export default function App() {
 
   // --- Handlers ---
 
-  const handleCommand = (cmd: string) => {
-    if (!robot.isConnected) return toast.error("Robot not connected");
-    toast.success(`Sending: ${cmd}`);
-    // TODO: Add roslib publisher here later
-  };
-
   const handleAddPosition = (pos: Omit<Position, "id">) => {
     const newPos = { ...pos, id: `pos-${Date.now()}` };
     setPositions([...positions, newPos]);
     toast.success("Waypoint added");
+  };
+
+  const handleSpeedChange = (mode: SpeedMode) => {
+    setSpeedMode(mode);
+    robot.setSpeedMode(mode); 
+  };
+
+  const handleCommand = (cmd: string) => {
+    if (!robot.isConnected) return toast.error("Robot Offline");
+    if (robot.mode === 'autonomous') return toast.error("Switch to Manual Mode");
+
+    // Format: move(x, y, z)
+    // x: +Forward / -Backward
+    // y: +Left / -Right 
+    // z: +Turn Left / -Turn Right
+
+    switch(cmd) {
+        // Cardinal Directions
+        case 'forward': robot.move(1.0, 0, 0); break;
+        case 'backward': robot.move(-1.0, 0, 0); break;
+        case 'left': robot.move(0, 1.0, 0); break;   // Strafe Left
+        case 'right': robot.move(0, -1.0, 0); break; // Strafe Right
+        case 'stop': robot.move(0, 0, 0); break;
+        
+        // Diagonals (Holonomic Movement)
+        // 0.707 (1/√2) to keep diagonal speed consistent with straight speed
+        case 'forward-left': robot.move(0.707, 0.707, 0); break; 
+        case 'forward-right': robot.move(0.707, -0.707, 0); break;
+        case 'backward-left': robot.move(-0.707, 0.707, 0); break;
+        case 'backward-right': robot.move(-0.707, -0.707, 0); break;
+        
+        // Rotation (In Place)
+        case 'rotate-left': robot.move(0, 0, 1.0); break;
+        case 'rotate-right': robot.move(0, 0, -1.0); break;
+        
+        default: console.log("Unknown command", cmd);
+    }
   };
 
   const navigationControl = {
@@ -195,21 +226,19 @@ export default function App() {
                   <VideoFeed isConnected={robot.isConnected} />
                 </Card>
                 <Card className="bg-slate-800/30 border-slate-700/50 flex-1 p-2 space-y-3">
-                  <div className="text-center">
-                    <div className="text-xl font-bold text-blue-400">
-                      {robot.speed.toFixed(2)} m/s
-                    </div>
-                    <SpeedControl
-                      selectedMode={speedMode}
-                      onModeChange={setSpeedMode}
-                      disabled={robot.mode === "autonomous"}
-                    />
-                  </div>
-                  <ControlButtons
-                    onCommand={handleCommand}
-                    disabled={!robot.isConnected || robot.mode === "autonomous"}
-                  />
-                </Card>
+                <div className="text-center">
+                   <div className="text-xl font-bold text-blue-400">{robot.speed.toFixed(2)} m/s</div>
+                   <SpeedControl 
+                     selectedMode={speedMode} 
+                     onModeChange={handleSpeedChange} 
+                     disabled={robot.mode === 'autonomous'} 
+                   />
+                </div>
+                <ControlButtons 
+                  onCommand={handleCommand} 
+                  disabled={!robot.isConnected || robot.mode === 'autonomous'} 
+                />
+              </Card>
               </div>
 
               {/* CENTER: Map (5 cols) */}

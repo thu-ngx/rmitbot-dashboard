@@ -16,3 +16,14 @@ export interface RobotState {
   mode: OperationMode;
   isNavigating: boolean;
 }
+
+export interface TwistStampedMessage {
+  header: {
+    stamp: { sec: number; nanosec: number };
+    frame_id: string;
+  };
+  twist: {
+    linear: { x: number; y: number; z: number };
+    angular: { x: number; y: number; z: number };
+  };
+}

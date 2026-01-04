@@ -18,7 +18,7 @@ const speedModes = [
 export function SpeedControl({ selectedMode, onModeChange, disabled = false }: SpeedControlProps) {
   return (
     <div className="grid grid-cols-3 gap-1">
-      {speedModes.map(({ mode, label, icon: Icon, speed, color }) => {
+      {speedModes.map(({ mode, icon: Icon, speed, color }) => {
         const isSelected = selectedMode === mode;
         return (
           <Button

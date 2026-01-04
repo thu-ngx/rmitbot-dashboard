@@ -1,3 +1,4 @@
+import type { TwistStampedMessage } from "@/types";
 import * as ROSLIB from "roslib";
 
 class RosService {
@@ -7,18 +8,27 @@ class RosService {
   url: string = "ws://100.68.218.48:9090";
   reconnectInterval: number = 3000;
   private isIntentionalDisconnect: boolean = false;
-  private constructor() {
-    this.ros = new ROSLIB.Ros({
-      url: this.url,
-    });
 
+  private cmdVelPublisher: ROSLIB.Topic<TwistStampedMessage> | null = null;
+
+  private isTransportReady(): boolean {
+    const transport = (
+      this.ros as unknown as {
+        transport?: { isOpen?: () => boolean; isConnecting?: () => boolean };
+      }
+    ).transport;
+    return Boolean(
+      transport && typeof transport.isOpen === "function" && transport.isOpen()
+    );
+  }
+
+  private constructor() {
+    this.ros = new ROSLIB.Ros({ url: this.url });
     this.setupListeners();
   }
 
   public static getInstance(): RosService {
-    if (!RosService.instance) {
-      RosService.instance = new RosService();
-    }
+    if (!RosService.instance) RosService.instance = new RosService();
     return RosService.instance;
   }
 
@@ -27,35 +37,60 @@ class RosService {
       console.log("Connected to WebSocket!");
       this.isConnected = true;
       this.isIntentionalDisconnect = false;
-    });
 
-    this.ros.on("error", (error) => {
-      console.error("WebSocket Error:", error);
+      this.initPublishers();
     });
 
     this.ros.on("close", () => {
-      console.log("WebSocket Connection closed.");
       this.isConnected = false;
-
-      // Only reconnect if we didn't mean to disconnect
+      this.cmdVelPublisher = null;
       if (!this.isIntentionalDisconnect) {
-        setTimeout(() => {
-          console.log("Reconnecting to WebSocket...");
-          this.connect();
-        }, this.reconnectInterval);
+        setTimeout(() => this.connect(), this.reconnectInterval);
       }
     });
+
+    this.ros.on("error", (error) => console.error("WebSocket Error:", error));
+  }
+
+  private initPublishers() {
+    this.cmdVelPublisher = new ROSLIB.Topic<TwistStampedMessage>({
+      ros: this.ros,
+      name: "/cmd_vel_joystick",
+      messageType: "geometry_msgs/TwistStamped",
+    });
+  }
+
+  public publishVelocity(x: number, y: number, angular: number) {
+    if (!this.isTransportReady() || !this.cmdVelPublisher) return;
+
+    const twistStamped = {
+      header: {
+        stamp: { sec: 0, nanosec: 0 },
+        frame_id: "base_footprint",
+      },
+      twist: {
+        linear: { x: x, y: y, z: 0 }, // <--- Added Y here!
+        angular: { x: 0, y: 0, z: angular },
+      },
+    };
+
+    this.cmdVelPublisher.publish(twistStamped);
   }
 
   connect() {
     this.isIntentionalDisconnect = false;
-    if (this.isConnected) return;
-
-    console.log("Attempting to connect to ROS Bridge...");
+    const transport = (
+      this.ros as unknown as {
+        transport?: { isOpen?: () => boolean; isConnecting?: () => boolean };
+      }
+    ).transport;
+    const alreadyOpen = transport?.isOpen?.();
+    const connecting = transport?.isConnecting?.();
+    if (this.isConnected || alreadyOpen || connecting) return;
     try {
       this.ros.connect(this.url);
-    } catch (error) {
-      console.error("WebSocket connection error:", error);
+    } catch (e) {
+      console.error(e);
     }
   }
 
