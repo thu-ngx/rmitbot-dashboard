@@ -6,7 +6,7 @@ class RosService {
   private static instance: RosService;
   ros: ROSLIB.Ros;
   isConnected: boolean = false;
-  url: string = ROS_CONFIG.UBUNTU_WS_URL;
+  url: string = ROS_CONFIG.ROS_WS_URL;
   reconnectInterval: number = ROS_CONFIG.RECONNECT_INTERVAL;
   private isIntentionalDisconnect: boolean = false;
 
