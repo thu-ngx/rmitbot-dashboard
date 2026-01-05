@@ -70,7 +70,7 @@ class RosService {
         frame_id: "base_footprint",
       },
       twist: {
-        linear: { x: x, y: y, z: 0 }, // <--- Added Y here!
+        linear: { x: x, y: y, z: 0 },
         angular: { x: 0, y: 0, z: angular },
       },
     };

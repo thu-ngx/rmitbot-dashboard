@@ -5,7 +5,8 @@ const ROSBRIDGE_PORT = 9090;
 const FOXGLOVE_PORT = 8765;
 
 // Ubuntu Configuration
-const UBUNTU_IP = "100.68.218.48";
+const UBUNTU_IP = "100.68.218.48"; // lesson 6
+// const UBUNTU_IP = "100.91.20.95"; // trustmebro
 const UBUNTU_ROS_WS = `ws://${UBUNTU_IP}:${ROSBRIDGE_PORT}`;
 const UBUNTU_FOXGLOVE_WS = `ws://${UBUNTU_IP}:${FOXGLOVE_PORT}`;
 
