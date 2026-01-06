@@ -15,17 +15,19 @@ class PositionService {
   }
 
   // Save current position
-  async savePosition(name: string): Promise<{ success: boolean; message: string }> {
+  async savePosition(
+    name: string
+  ): Promise<{ success: boolean; message: string }> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
-      
+
       const savePositionService = new ROSLIB.Service({
         ros: ros,
         name: "/save_position",
         serviceType: "position_manager/SavePosition",
       });
 
-      const request = new ROSLIB.ServiceRequest({ name });
+      const request = { name };
 
       savePositionService.callService(
         request,
@@ -47,26 +49,28 @@ class PositionService {
   async getPositions(): Promise<SavedPosition[]> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
-      
+
       const getPositionsService = new ROSLIB.Service({
         ros: ros,
         name: "/get_positions",
         serviceType: "position_manager/GetPositions",
       });
 
-      const request = new ROSLIB.ServiceRequest({});
+      const request = {};
 
       getPositionsService.callService(
         request,
         (response: any) => {
-          const positions: SavedPosition[] = response.names.map((name: string, index: number) => ({
-            id: `pos-${index}`,
-            name,
-            x: response.x_coords[index],
-            y: response.y_coords[index],
-            theta: response.theta_coords[index],
-            timestamp: Date.now(),
-          }));
+          const positions: SavedPosition[] = response.names.map(
+            (name: string, index: number) => ({
+              id: `pos-${index}`,
+              name,
+              x: response.x_coords[index],
+              y: response.y_coords[index],
+              theta: response.theta_coords[index],
+              timestamp: Date.now(),
+            })
+          );
           resolve(positions);
         },
         (error: any) => {
@@ -81,14 +85,14 @@ class PositionService {
   async deletePosition(name: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
-      
+
       const deletePositionService = new ROSLIB.Service({
         ros: ros,
         name: "/delete_position",
         serviceType: "position_manager/DeletePosition",
       });
 
-      const request = new ROSLIB.ServiceRequest({ name });
+      const request = { name };
 
       deletePositionService.callService(
         request,
@@ -104,10 +108,13 @@ class PositionService {
   }
 
   // Navigate to single position
-  async navigateToPosition(name: string, onFeedback?: (feedback: any) => void): Promise<boolean> {
+  async navigateToPosition(
+    name: string,
+    onFeedback?: (feedback: any) => void
+  ): Promise<boolean> {
     return new Promise((resolve) => {
       const ros = rosService.getROS();
-      
+
       const navigateToPositionAction = new ROSLIB.ActionClient({
         ros: ros,
         serverName: "/navigate_to_position",
@@ -138,7 +145,7 @@ class PositionService {
   ): Promise<boolean> {
     return new Promise((resolve) => {
       const ros = rosService.getROS();
-      
+
       const navigateThroughAction = new ROSLIB.ActionClient({
         ros: ros,
         serverName: "/navigate_through_positions",
@@ -166,7 +173,7 @@ class PositionService {
   async getCurrentPose(): Promise<RobotPose> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
-      
+
       const odomListener = new ROSLIB.Topic({
         ros: ros,
         name: "/odom",
@@ -186,8 +193,11 @@ class PositionService {
         const orientation = message.pose.pose.orientation;
 
         // Convert quaternion to yaw
-        const siny_cosp = 2 * (orientation.w * orientation.z + orientation.x * orientation.y);
-        const cosy_cosp = 1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z);
+        const siny_cosp =
+          2 * (orientation.w * orientation.z + orientation.x * orientation.y);
+        const cosy_cosp =
+          1 -
+          2 * (orientation.y * orientation.y + orientation.z * orientation.z);
         const theta = Math.atan2(siny_cosp, cosy_cosp);
 
         resolve({

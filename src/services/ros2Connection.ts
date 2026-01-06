@@ -10,8 +10,8 @@ class RosService {
   reconnectInterval: number = ROS_CONFIG.RECONNECT_INTERVAL;
   private isIntentionalDisconnect: boolean = false;
 
-  private cmdVelPublisher: ROSLIB.Topic | null = null;
-  private odomSubscriber: ROSLIB.Topic | null = null;
+  private cmdVelPublisher: ROSLIB.Topic<TwistMessage> | null = null;
+  private odomSubscriber: ROSLIB.Topic<OdometryMessage> | null = null;
   private odomCallback: ((data: OdometryMessage) => void) | null = null;
 
   private constructor() {
@@ -31,8 +31,12 @@ class RosService {
       console.log("✅ Connected to ROS WebSocket!");
       this.isConnected = true;
       this.isIntentionalDisconnect = false;
-      this.initPublishers();
-      this.initSubscribers();
+      
+      // Add a small delay to ensure WebSocket is fully ready to send data
+      setTimeout(() => {
+        this.initPublishers();
+        this.initSubscribers();
+      }, 500); 
     });
 
     this.ros.on("close", () => {
