@@ -2,120 +2,76 @@ import { useState } from "react";
 import { Toaster, toast } from "sonner";
 import {
   Gamepad2,
-  Navigation2,
-  Activity,
   Wifi,
-  Save,
   AlertOctagon,
+  ExternalLink,
 } from "lucide-react";
 
-// Components
-import { VideoFeed } from "./components/VideoFeed";
 import { ControlButtons } from "./components/ControlButtons";
 import { SpeedControl } from "./components/SpeedControl";
-import { MapView } from "./components/MapView";
-import { PathQueue } from "./components/PathQueue";
-import { DataVisualization } from "./components/DataVisualization";
-
-// UI
+import { PositionManager } from "./components/PositionManager";
+import { StatusDisplay } from "./components/StatusDisplay";
 import { Card } from "./components/ui/card";
 import { Switch } from "./components/ui/switch";
 import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 
-// Logic & Types
 import { useRobot } from "./hooks/useRobot";
-import type { Position, SpeedMode } from "./types";
+import type { SpeedMode } from "./types";
+import { ROS_CONFIG } from "./config";
 
 export default function App() {
-  // 1. Core Robot State
   const robot = useRobot();
-
-  // 2. Local App State (UI preferences)
   const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
-  const [viewTab, setViewTab] = useState<"control" | "visualization">(
-    "control"
-  );
-
-  // 3. Navigation Data
-  const [positions, setPositions] = useState<Position[]>([]);
-  const [currentPosIndex, setCurrentPosIndex] = useState(0);
-
-  // --- Handlers ---
-
-  const handleAddPosition = (pos: Omit<Position, "id">) => {
-    const newPos = { ...pos, id: `pos-${Date.now()}` };
-    setPositions([...positions, newPos]);
-    toast.success("Waypoint added");
-  };
 
   const handleSpeedChange = (mode: SpeedMode) => {
     setSpeedMode(mode);
-    robot.setSpeedMode(mode); 
+    robot.setSpeedMode(mode);
   };
 
   const handleCommand = (cmd: string) => {
     if (!robot.isConnected) return toast.error("Robot Offline");
-    if (robot.mode === 'autonomous') return toast.error("Switch to Manual Mode");
+    if (robot.mode === "autonomous") return toast.error("Switch to Manual Mode");
 
-    // Format: move(x, y, z)
-    // x: +Forward / -Backward
-    // y: +Left / -Right 
-    // z: +Turn Left / -Turn Right
-
-    switch(cmd) {
-        // Cardinal Directions
-        case 'forward': robot.move(1.0, 0, 0); break;
-        case 'backward': robot.move(-1.0, 0, 0); break;
-        case 'left': robot.move(0, 1.0, 0); break;   // Strafe Left
-        case 'right': robot.move(0, -1.0, 0); break; // Strafe Right
-        case 'stop': robot.move(0, 0, 0); break;
-        
-        // Diagonals (Holonomic Movement)
-        // 0.707 (1/√2) to keep diagonal speed consistent with straight speed
-        case 'forward-left': robot.move(0.707, 0.707, 0); break; 
-        case 'forward-right': robot.move(0.707, -0.707, 0); break;
-        case 'backward-left': robot.move(-0.707, 0.707, 0); break;
-        case 'backward-right': robot.move(-0.707, -0.707, 0); break;
-        
-        // Rotation (In Place)
-        case 'rotate-left': robot.move(0, 0, 1.0); break;
-        case 'rotate-right': robot.move(0, 0, -1.0); break;
-        
-        default: console.log("Unknown command", cmd);
+    switch (cmd) {
+      case "forward":
+        robot.move(1.0, 0, 0);
+        break;
+      case "backward":
+        robot.move(-1.0, 0, 0);
+        break;
+      case "left":
+        robot.move(0, 1.0, 0);
+        break;
+      case "right":
+        robot.move(0, -1.0, 0);
+        break;
+      case "stop":
+        robot.move(0, 0, 0);
+        break;
+      case "forward-left":
+        robot.move(0.707, 0.707, 0);
+        break;
+      case "forward-right":
+        robot.move(0.707, -0.707, 0);
+        break;
+      case "backward-left":
+        robot.move(-0.707, 0.707, 0);
+        break;
+      case "backward-right":
+        robot.move(-0.707, -0.707, 0);
+        break;
+      case "rotate-left":
+        robot.move(0, 0, 1.0);
+        break;
+      case "rotate-right":
+        robot.move(0, 0, -1.0);
+        break;
+      default:
+        console.log("Unknown command", cmd);
     }
   };
 
-  const navigationControl = {
-    start: () => {
-      if (positions.length === 0) return toast.error("Queue empty");
-      robot.setNavigating(true);
-      setCurrentPosIndex(0);
-      toast.success("Navigation Started");
-    },
-    stop: () => {
-      robot.setNavigating(false);
-      toast.warning("Navigation Stopped");
-    },
-    skip: () => {
-      const next = currentPosIndex + 1;
-      if (next >= positions.length) {
-        robot.setNavigating(false);
-        toast.success("All destinations reached!");
-      } else {
-        setCurrentPosIndex(next);
-        toast.info(`Moving to waypoint ${next + 1}`);
-      }
-    },
-    goTo: (index: number) => {
-      if (robot.mode !== "autonomous")
-        return toast.error("Switch to Autonomous mode first");
-      setCurrentPosIndex(index);
-      robot.setNavigating(true);
-    },
-  };
-
-  // Helper for status color
   const getStatusColor = () => {
     switch (robot.status) {
       case "CONNECTED":
@@ -146,68 +102,34 @@ export default function App() {
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
       <Toaster theme="dark" />
 
-      {/* --- HEADER --- */}
+      {/* Header */}
       <div className="border-b border-slate-800/50 bg-slate-900/30 backdrop-blur-sm sticky top-0 z-10">
-        <div className="container mx-auto px-3 py-2 max-w-[1800px] flex items-center justify-between">
-          <h1 className="text-sm font-semibold w-64">RMIT Robot Control</h1>
-
-          {/* Center Mode Switcher */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant={robot.mode === "manual" ? "default" : "outline"}
-                onClick={() => robot.setMode("manual")}
-                className="h-7 px-3 text-xs bg-purple-600 hover:bg-purple-700 border-0"
-              >
-                <Gamepad2 className="w-3 h-3 mr-1.5" /> Manual
-              </Button>
-              <Button
-                size="sm"
-                variant={robot.mode === "autonomous" ? "default" : "outline"}
-                onClick={() => robot.setMode("autonomous")}
-                className="h-7 px-3 text-xs bg-blue-600 hover:bg-blue-700 border-0"
-              >
-                <Navigation2 className="w-3 h-3 mr-1.5" /> Autonomous
-              </Button>
-            </div>
-            <span
-              className={`text-[10px] font-medium ${
-                robot.isNavigating ? "text-green-500" : "text-slate-500"
-              }`}
-            >
-              {robot.isNavigating
-                ? "• NAVIGATION ACTIVE •"
-                : robot.isConnected
-                ? "STANDBY"
-                : "OFFLINE"}
-            </span>
+        <div className="container mx-auto px-4 py-3 max-w-7xl flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <h1 className="text-lg font-bold">🤖 Robot Control Panel</h1>
+            <Badge variant="outline" className="text-xs">
+              {ROS_CONFIG.TARGET.toUpperCase()} ({ROS_CONFIG.IP})
+            </Badge>
           </div>
 
-          {/* Right Connection Status */}
-          <div className="w-64 flex justify-end items-center gap-3">
+          <div className="flex items-center gap-4">
             <Button
               size="sm"
               variant="ghost"
               onClick={() =>
-                setViewTab(viewTab === "control" ? "visualization" : "control")
+                window.open(`http://${ROS_CONFIG.IP}:${ROS_CONFIG.FOXGLOVE_PORT}`, "_blank")
               }
-              className={`h-7 px-2 ${
-                viewTab === "visualization" ? "bg-slate-800 text-blue-400" : ""
-              }`}
+              className="h-8 text-xs"
             >
-              <Activity className="w-3 h-3 mr-1" /> Data
+              <ExternalLink className="w-3 h-3 mr-2" />
+              Open Foxglove
             </Button>
 
             <div className="flex items-center gap-2 pl-3 border-l border-slate-800">
-              {/* Use the new dynamic color function */}
-              <Wifi className={`w-3 h-3 ${getStatusColor()}`} />
-
-              {/* Add text status if you want, or just the switch */}
-              <span className={`text-[10px] font-bold ${getStatusColor()}`}>
+              <Wifi className={`w-4 h-4 ${getStatusColor()}`} />
+              <span className={`text-xs font-bold ${getStatusColor()}`}>
                 {getStatusText()}
               </span>
-
               <Switch
                 checked={robot.isConnected}
                 onCheckedChange={robot.toggleConnection}
@@ -215,124 +137,99 @@ export default function App() {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* --- MAIN CONTENT --- */}
-        <div className="container mx-auto px-3 py-2 max-w-[1800px]">
-          {viewTab === "control" ? (
-            <div className="grid grid-cols-12 gap-2 h-[calc(100vh-80px)]">
-              {/* LEFT: Camera & Manual Controls (3 cols) */}
-              <div className="col-span-3 flex flex-col gap-2">
-                <Card className="bg-slate-800/30 border-slate-700/50 p-2">
-                  <VideoFeed isConnected={robot.isConnected} />
-                </Card>
-                <Card className="bg-slate-800/30 border-slate-700/50 flex-1 p-2 space-y-3">
+      {/* Main Content */}
+      <div className="container mx-auto px-4 py-4 max-w-7xl">
+        <div className="grid grid-cols-12 gap-4 h-[calc(100vh-120px)]">
+          {/* Left Column: Manual Control */}
+          <div className="col-span-4 flex flex-col gap-4">
+            <Card className="bg-slate-800/30 border-slate-700/50 p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold flex items-center gap-2">
+                  <Gamepad2 className="w-4 h-4" />
+                  Manual Control
+                </h2>
+                <Badge
+                  variant={robot.mode === "manual" ? "default" : "outline"}
+                  className="text-xs"
+                >
+                  {robot.mode === "manual" ? "Active" : "Disabled"}
+                </Badge>
+              </div>
+
+              <div className="space-y-4">
                 <div className="text-center">
-                   <div className="text-xl font-bold text-blue-400">{robot.speed.toFixed(2)} m/s</div>
-                   <SpeedControl 
-                     selectedMode={speedMode} 
-                     onModeChange={handleSpeedChange} 
-                     disabled={robot.mode === 'autonomous'} 
-                   />
+                  <div className="text-2xl font-bold text-blue-400 mb-2">
+                    {robot.speed.toFixed(2)} m/s
+                  </div>
+                  <SpeedControl
+                    selectedMode={speedMode}
+                    onModeChange={handleSpeedChange}
+                    disabled={robot.mode === "autonomous"}
+                  />
                 </div>
-                <ControlButtons 
-                  onCommand={handleCommand} 
-                  disabled={!robot.isConnected || robot.mode === 'autonomous'} 
+
+                <ControlButtons
+                  onCommand={handleCommand}
+                  disabled={!robot.isConnected || robot.mode === "autonomous"}
                 />
-              </Card>
               </div>
+            </Card>
 
-              {/* CENTER: Map (5 cols) */}
-              <div className="col-span-5 flex flex-col">
-                <Card className="bg-slate-800/30 border-slate-700/50 flex-1 flex flex-col p-1">
-                  <div className="p-2 flex justify-between items-center">
-                    <Button
-                      size="sm"
-                      onClick={() =>
-                        handleAddPosition({
-                          x: 50,
-                          y: 50,
-                          name: `Point ${positions.length + 1}`,
-                        })
-                      }
-                      disabled={!robot.isConnected}
-                      className="h-6 text-[10px] bg-blue-600"
-                    >
-                      <Save className="w-3 h-3 mr-1" /> Add Point
-                    </Button>
-                    <Badge variant="outline">
-                      {positions.length} Waypoints
-                    </Badge>
-                  </div>
-                  <div className="flex-1 border rounded border-slate-700/50 overflow-hidden relative">
-                    <MapView
-                      positions={positions}
-                      onAddPosition={handleAddPosition}
-                      onRemovePosition={(id) =>
-                        setPositions((p) => p.filter((x) => x.id !== id))
-                      }
-                      disabled={!robot.isConnected}
-                    />
-                  </div>
-                </Card>
-              </div>
+            <Button
+              className="w-full bg-red-600 hover:bg-red-700 font-bold h-12"
+              onClick={() => {
+                robot.move(0, 0, 0);
+                toast.error("EMERGENCY STOP");
+              }}
+            >
+              <AlertOctagon className="w-5 h-5 mr-2" /> EMERGENCY STOP
+            </Button>
+          </div>
 
-              {/* RIGHT: Status & Queue (4 cols) */}
-              <div className="col-span-4 flex flex-col gap-2">
-                <div className="grid grid-cols-2 gap-2">
-                  <div className="bg-slate-800/50 rounded p-2 text-center border border-slate-700">
-                    <div className="text-[10px] text-slate-400">BATTERY</div>
-                    <div
-                      className={`font-bold ${
-                        robot.batteryLevel < 20
-                          ? "text-red-500"
-                          : "text-green-400"
-                      }`}
-                    >
-                      {robot.batteryLevel.toFixed(0)}%
-                    </div>
-                  </div>
-                  <div className="bg-slate-800/50 rounded p-2 text-center border border-slate-700">
-                    <div className="text-[10px] text-slate-400">SIGNAL</div>
-                    <div className="text-blue-400 font-bold">
-                      {robot.signalStrength.toFixed(0)}%
-                    </div>
-                  </div>
+          {/* Middle Column: Robot Status */}
+          <div className="col-span-4 flex flex-col gap-4">
+            <StatusDisplay isConnected={robot.isConnected} />
+
+            <Card className="bg-slate-800/30 border-slate-700/50 flex-1 p-4">
+              <h2 className="text-sm font-semibold mb-3">📍 Quick Info</h2>
+              <div className="space-y-2 text-xs">
+                <div className="flex justify-between">
+                  <span className="text-slate-400">ROS Bridge:</span>
+                  <span className="font-mono">{ROS_CONFIG.ROS_WS_URL}</span>
                 </div>
-
-                <PathQueue
-                  positions={positions}
-                  isNavigating={robot.isNavigating}
-                  currentPositionIndex={currentPosIndex}
-                  onStart={navigationControl.start}
-                  onStop={navigationControl.stop}
-                  onSkip={navigationControl.skip}
-                  onGoTo={navigationControl.goTo}
-                  onRemove={(id) =>
-                    setPositions((p) => p.filter((x) => x.id !== id))
-                  }
-                  onClear={() => setPositions([])}
-                  disabled={!robot.isConnected || robot.mode === "manual"}
-                />
-
-                <div className="mt-auto pt-2">
-                  <Button
-                    className="w-full bg-red-600 hover:bg-red-700 font-bold"
-                    onClick={() => {
-                      robot.setNavigating(false);
-                      toast.error("EMERGENCY STOP");
-                    }}
-                  >
-                    <AlertOctagon className="w-4 h-4 mr-2" /> EMERGENCY STOP
-                  </Button>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Foxglove:</span>
+                  <span className="font-mono">:{ROS_CONFIG.FOXGLOVE_PORT}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-slate-400">Control Mode:</span>
+                  <Badge variant="outline" className="text-[10px]">
+                    {robot.mode}
+                  </Badge>
                 </div>
               </div>
-            </div>
-          ) : (
-            <DataVisualization
+
+              <div className="mt-4 p-3 bg-blue-500/10 border border-blue-500/30 rounded text-xs">
+                <p className="text-blue-300 font-semibold mb-1">💡 Quick Start:</p>
+                <ol className="text-slate-300 space-y-1 list-decimal list-inside text-[11px]">
+                  <li>Drive robot to a location</li>
+                  <li>Save position with a name</li>
+                  <li>Select positions to navigate</li>
+                  <li>View visualization in Foxglove</li>
+                </ol>
+              </div>
+            </Card>
+          </div>
+
+          {/* Right Column: Position Manager */}
+          <div className="col-span-4">
+            <PositionManager
               isConnected={robot.isConnected}
-              isActive={true}
+              disabled={robot.mode === "autonomous"}
             />
-          )}
+          </div>
         </div>
       </div>
     </div>
