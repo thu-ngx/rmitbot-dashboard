@@ -22,16 +22,21 @@ interface PositionManagerProps {
   disabled?: boolean;
 }
 
-export function PositionManager({ isConnected, disabled = false }: PositionManagerProps) {
+export function PositionManager({
+  isConnected,
+  disabled = false,
+}: PositionManagerProps) {
   const [positions, setPositions] = useState<SavedPosition[]>([]);
-  const [selectedPositions, setSelectedPositions] = useState<Set<string>>(new Set());
+  const [selectedPositions, setSelectedPositions] = useState<Set<string>>(
+    new Set()
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
   const [newPositionName, setNewPositionName] = useState("");
-  const [currentNavigatingIndex, setCurrentNavigatingIndex] = useState<number>(-1);
+  const [currentNavigatingIndex, setCurrentNavigatingIndex] =
+    useState<number>(-1);
 
-  // Load positions on mount
   useEffect(() => {
     if (isConnected) {
       loadPositions();
@@ -132,7 +137,11 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
         (feedback) => {
           if (feedback.current_index !== undefined) {
             setCurrentNavigatingIndex(feedback.current_index);
-            toast.info(`At position ${feedback.current_index + 1}/${selectedNames.length}`);
+            toast.info(
+              `At position ${feedback.current_index + 1}/${
+                selectedNames.length
+              }`
+            );
           }
         }
       );
@@ -164,12 +173,15 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
     <Card className="bg-slate-800/30 border-slate-700/50 h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-sm flex items-center gap-2">
+          <CardTitle className="text-sm flex items-center gap-2 text-white">
             <MapPin className="w-4 h-4" />
             Position Manager
           </CardTitle>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-xs">
+            <Badge
+              variant="outline"
+              className="text-xs text-slate-300 border-slate-600"
+            >
               {positions.length} saved
             </Badge>
             <Button
@@ -177,9 +189,13 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
               variant="ghost"
               onClick={loadPositions}
               disabled={!isConnected || isLoading}
-              className="h-7 w-7 p-0"
+              className="h-7 w-7 p-0 hover:bg-slate-700"
             >
-              <RefreshCw className={`w-3 h-3 ${isLoading ? "animate-spin" : ""}`} />
+              <RefreshCw
+                className={`w-3 h-3 text-slate-300 ${
+                  isLoading ? "animate-spin" : ""
+                }`}
+              />
             </Button>
           </div>
         </div>
@@ -193,14 +209,16 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
             value={newPositionName}
             onChange={(e) => setNewPositionName(e.target.value)}
             disabled={!isConnected || disabled || isSaving}
-            className="h-8 text-xs"
+            className="h-8 text-xs bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
             onKeyPress={(e) => e.key === "Enter" && handleSavePosition()}
           />
           <Button
             size="sm"
             onClick={handleSavePosition}
-            disabled={!isConnected || disabled || isSaving || !newPositionName.trim()}
-            className="h-8 px-3 bg-green-600 hover:bg-green-700"
+            disabled={
+              !isConnected || disabled || isSaving || !newPositionName.trim()
+            }
+            className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
           >
             {isSaving ? (
               <RefreshCw className="w-3 h-3 animate-spin" />
@@ -221,7 +239,7 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
                 size="sm"
                 onClick={handleNavigateSelected}
                 disabled={!isConnected || disabled}
-                className="flex-1 h-8 bg-blue-600 hover:bg-blue-700"
+                className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 text-white"
               >
                 <Play className="w-3 h-3 mr-1" />
                 Navigate Selected ({selectedPositions.size})
@@ -245,12 +263,15 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
           {positions.length === 0 ? (
             <div className="text-center py-8 text-slate-400 text-xs">
               No saved positions
-              <p className="text-[10px] mt-1">Drive to a location and save it</p>
+              <p className="text-[10px] mt-1 text-slate-500">
+                Drive to a location and save it
+              </p>
             </div>
           ) : (
             positions.map((pos, index) => {
               const isSelected = selectedPositions.has(pos.name);
-              const isCurrentlyNavigating = isNavigating && currentNavigatingIndex === index;
+              const isCurrentlyNavigating =
+                isNavigating && currentNavigatingIndex === index;
 
               return (
                 <div
@@ -267,15 +288,16 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
                     checked={isSelected}
                     onCheckedChange={() => toggleSelection(pos.name)}
                     disabled={!isConnected || disabled || isNavigating}
-                    className="h-4 w-4"
+                    className="h-4 w-4 border-slate-500"
                   />
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-white truncate">
+                    <div className="text-xs font-medium text-slate-200 truncate">
                       {pos.name}
                     </div>
                     <div className="text-[10px] text-slate-400">
-                      x: {pos.x.toFixed(2)}, y: {pos.y.toFixed(2)}, θ: {pos.theta.toFixed(2)}
+                      x: {pos.x.toFixed(2)}, y: {pos.y.toFixed(2)}, θ:{" "}
+                      {pos.theta.toFixed(2)}
                     </div>
                   </div>
 
@@ -284,7 +306,7 @@ export function PositionManager({ isConnected, disabled = false }: PositionManag
                       size="sm"
                       onClick={() => handleNavigateToSingle(pos.name)}
                       disabled={!isConnected || disabled || isNavigating}
-                      className="h-6 px-2 bg-blue-600/80 hover:bg-blue-600 text-[10px]"
+                      className="h-6 px-2 bg-blue-600/80 hover:bg-blue-600 text-white text-[10px]"
                     >
                       <Navigation className="w-3 h-3" />
                     </Button>

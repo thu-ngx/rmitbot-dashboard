@@ -9,7 +9,11 @@ interface StatusDisplayProps {
 }
 
 export function StatusDisplay({ isConnected }: StatusDisplayProps) {
-  const [currentPose, setCurrentPose] = useState<RobotPose>({ x: 0, y: 0, theta: 0 });
+  const [currentPose, setCurrentPose] = useState<RobotPose>({
+    x: 0,
+    y: 0,
+    theta: 0,
+  });
   const [speed, setSpeed] = useState(0);
   const [batteryLevel, setBatteryLevel] = useState(85);
 
@@ -22,8 +26,10 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
       const orientation = data.pose.pose.orientation;
 
       // Convert quaternion to yaw
-      const siny_cosp = 2 * (orientation.w * orientation.z + orientation.x * orientation.y);
-      const cosy_cosp = 1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z);
+      const siny_cosp =
+        2 * (orientation.w * orientation.z + orientation.x * orientation.y);
+      const cosy_cosp =
+        1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z);
       const theta = Math.atan2(siny_cosp, cosy_cosp);
 
       setCurrentPose({
@@ -58,16 +64,18 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
           <div className="text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               <MapPin className="w-3 h-3 text-blue-400" />
-              <span className="text-[9px] text-slate-400 uppercase">Position</span>
+              <span className="text-[9px] text-slate-400 uppercase">
+                Position
+              </span>
             </div>
-            <div className="text-xs font-mono text-white">
+            <div className="text-xs font-mono text-slate-200">
               x: {currentPose.x.toFixed(2)}
             </div>
-            <div className="text-xs font-mono text-white">
+            <div className="text-xs font-mono text-slate-200">
               y: {currentPose.y.toFixed(2)}
             </div>
             <div className="text-[10px] font-mono text-slate-400">
-              θ: {(currentPose.theta * 180 / Math.PI).toFixed(1)}°
+              θ: {((currentPose.theta * 180) / Math.PI).toFixed(1)}°
             </div>
           </div>
 
@@ -87,7 +95,9 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
           <div className="text-center">
             <div className="flex items-center justify-center gap-1 mb-1">
               <Battery className="w-3 h-3 text-yellow-400" />
-              <span className="text-[9px] text-slate-400 uppercase">Battery</span>
+              <span className="text-[9px] text-slate-400 uppercase">
+                Battery
+              </span>
             </div>
             <div
               className={`text-xl font-bold ${
