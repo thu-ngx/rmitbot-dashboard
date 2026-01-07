@@ -1,5 +1,5 @@
 import { Badge } from './ui/badge';
-import { Battery, Wifi, WifiOff, Gauge, Signal } from 'lucide-react';
+import { Wifi, WifiOff, Gauge } from 'lucide-react';
 import { Card } from './ui/card';
 
 interface StatusPanelProps {
@@ -9,12 +9,12 @@ interface StatusPanelProps {
   signalStrength: number;
 }
 
-export function StatusPanel({ isConnected, batteryLevel, speed, signalStrength }: StatusPanelProps) {
-  const getBatteryColor = () => {
-    if (batteryLevel > 60) return 'text-green-500';
-    if (batteryLevel > 20) return 'text-yellow-500';
-    return 'text-red-500';
-  };
+export function StatusPanel({ isConnected, speed }: StatusPanelProps) {
+  // const getBatteryColor = () => {
+  //   if (batteryLevel > 60) return 'text-green-500';
+  //   if (batteryLevel > 20) return 'text-yellow-500';
+  //   return 'text-red-500';
+  // };
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
@@ -39,7 +39,7 @@ export function StatusPanel({ isConnected, batteryLevel, speed, signalStrength }
       </Card>
 
       {/* Battery Level */}
-      <Card className="p-3 bg-slate-900/50 border-slate-700">
+      {/* <Card className="p-3 bg-slate-900/50 border-slate-700">
         <div className="flex flex-col items-center justify-center gap-2 text-center">
           <div className="flex items-center gap-1.5">
             <Battery className={`w-4 h-4 ${isConnected ? getBatteryColor() : 'text-slate-600'}`} />
@@ -49,7 +49,7 @@ export function StatusPanel({ isConnected, batteryLevel, speed, signalStrength }
             {isConnected ? `${Math.round(batteryLevel)}%` : '--'}
           </span>
         </div>
-      </Card>
+      </Card> */}
 
       {/* Speed */}
       <Card className="p-3 bg-slate-900/50 border-slate-700">
@@ -65,7 +65,7 @@ export function StatusPanel({ isConnected, batteryLevel, speed, signalStrength }
       </Card>
 
       {/* Signal Strength */}
-      <Card className="p-3 bg-slate-900/50 border-slate-700">
+      {/* <Card className="p-3 bg-slate-900/50 border-slate-700">
         <div className="flex flex-col items-center justify-center gap-2 text-center">
           <div className="flex items-center gap-1.5">
             <Signal className={`w-4 h-4 ${isConnected ? 'text-cyan-500' : 'text-slate-600'}`} />
@@ -75,7 +75,7 @@ export function StatusPanel({ isConnected, batteryLevel, speed, signalStrength }
             {isConnected ? `${Math.round(signalStrength)}%` : '--'}
           </span>
         </div>
-      </Card>
+      </Card> */}
     </div>
   );
 }

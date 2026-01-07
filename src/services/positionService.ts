@@ -1,6 +1,13 @@
 import * as ROSLIB from "roslib";
 import { rosService } from "./ros2Connection";
-import type { SavedPosition, RobotPose } from "@/types";
+import type { 
+  SavedPosition, 
+  RobotPose,
+  // NavigatePositionRequest,
+  // NavigateThroughPositionsGoal,
+  NavigateThroughPositionsFeedback,
+  NavigateThroughPositionsResult
+} from "@/types";
 
 class PositionService {
   private static instance: PositionService;
@@ -21,6 +28,11 @@ class PositionService {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
+      }
+
       const savePositionService = new ROSLIB.Service({
         ros: ros,
         name: "/save_position",
@@ -32,19 +44,21 @@ class PositionService {
       savePositionService.callService(
         request,
         (response: any) => {
+          console.log("✅ Position saved:", response);
           resolve({
             success: response.success,
             message: response.message,
           });
         },
         (error: any) => {
-          console.error("Save position failed:", error);
+          console.error("❌ Save position failed:", error);
           reject(error);
         }
       );
     });
   }
 
+  // Get all positions
   async getPositions(): Promise<SavedPosition[]> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
@@ -65,6 +79,7 @@ class PositionService {
       getPositionsService.callService(
         request,
         (response: any) => {
+          console.log("✅ Positions loaded:", response);
           const positions: SavedPosition[] = response.names.map(
             (name: string, index: number) => ({
               id: `pos-${index}`,
@@ -78,16 +93,22 @@ class PositionService {
           resolve(positions);
         },
         (error: any) => {
-          console.error("Get positions failed:", error);
+          console.error("❌ Get positions failed:", error);
           reject(error);
         }
       );
     });
   }
 
+  // Delete position
   async deletePosition(name: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
+
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
+      }
 
       const deletePositionService = new ROSLIB.Service({
         ros: ros,
@@ -100,75 +121,120 @@ class PositionService {
       deletePositionService.callService(
         request,
         (response: any) => {
+          console.log("✅ Position deleted:", response);
           resolve(response.success);
         },
         (error: any) => {
-          console.error("Delete position failed:", error);
+          console.error("❌ Delete position failed:", error);
           reject(error);
         }
       );
     });
   }
 
-  // Navigate to single position
-  async navigateToPosition(
-    name: string,
-    onFeedback?: (feedback: any) => void
-  ): Promise<boolean> {
-    return new Promise((resolve) => {
+  // Navigate to single position (service)
+  async navigateToPosition(name: string): Promise<{ success: boolean; message: string }> {
+    return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
-      const navigateToPositionAction = new ROSLIB.ActionClient({
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
+      }
+
+      console.log(`📍 Navigating to position: ${name}`);
+
+      const navigateService = new ROSLIB.Service({
         ros: ros,
-        serverName: "/navigate_to_position",
-        actionName: "position_manager/srv/NavigateToPosition",
+        name: "/navigate_to_position",
+        serviceType: "position_manager_msgs/srv/NavigateToPosition",
       });
 
-      const goal = new ROSLIB.Goal({
-        actionClient: navigateToPositionAction,
-        goalMessage: { position_name: name },
-      });
+      const request = { position_name: name };
 
-      goal.on("feedback", (feedback: any) => {
-        if (onFeedback) onFeedback(feedback);
-      });
+      const timeout = setTimeout(() => {
+        reject(new Error("Navigation timeout"));
+      }, 360000); // 6 minutes
 
-      goal.on("result", (result: any) => {
-        resolve(result.success);
-      });
-
-      goal.send();
+      navigateService.callService(
+        request,
+        (response: any) => {
+          clearTimeout(timeout);
+          console.log("✅ Navigation result:", response);
+          resolve({
+            success: response.success,
+            message: response.message,
+          });
+        },
+        (error: any) => {
+          clearTimeout(timeout);
+          console.error("❌ Navigation failed:", error);
+          reject(error);
+        }
+      );
     });
   }
 
-  // Navigate through multiple positions
+  // Navigate through multiple positions (ACTION)
   async navigateThroughPositions(
     names: string[],
-    onFeedback?: (feedback: any) => void
-  ): Promise<boolean> {
-    return new Promise((resolve) => {
+    onFeedback?: (feedback: NavigateThroughPositionsFeedback) => void
+  ): Promise<NavigateThroughPositionsResult> {
+    return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
-      const navigateThroughAction = new ROSLIB.ActionClient({
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
+      }
+
+      console.log(`📍 Navigating through ${names.length} positions:`, names);
+
+      const actionClient = new ROSLIB.ActionClient({
         ros: ros,
         serverName: "/navigate_through_positions",
-        actionName: "position_manager/srv/NavigateThroughPositions",
+        actionName: "position_manager_msgs/action/NavigatePositions",
       });
 
-      const goal = new ROSLIB.Goal({
-        actionClient: navigateThroughAction,
-        goalMessage: { position_names: names },
-      });
+      // Wait for action server
+      const checkServer = setInterval(() => {
+        if (actionClient.isServerReady()) {
+          clearInterval(checkServer);
+          
+          const goal = new ROSLIB.Goal({
+            actionClient: actionClient,
+            goalMessage: { position_names: names },
+          });
 
-      goal.on("feedback", (feedback: any) => {
-        if (onFeedback) onFeedback(feedback);
-      });
+          goal.on("feedback", (feedback: any) => {
+            console.log("📡 Navigation feedback:", feedback);
+            if (onFeedback) {
+              onFeedback(feedback);
+            }
+          });
 
-      goal.on("result", (result: any) => {
-        resolve(result.success);
-      });
+          goal.on("result", (result: any) => {
+            console.log("✅ Navigation complete:", result);
+            resolve({
+              success: result.success,
+              message: result.message,
+              positions_reached: result.positions_reached,
+            });
+          });
 
-      goal.send();
+          goal.on("cancel", () => {
+            console.log("⛔ Navigation cancelled");
+            reject(new Error("Navigation cancelled"));
+          });
+
+          goal.send();
+        }
+      }, 100);
+
+      setTimeout(() => {
+        clearInterval(checkServer);
+        reject(new Error("Action server not ready"));
+      }, 5000);
     });
   }
 
@@ -192,15 +258,24 @@ class PositionService {
         clearTimeout(timeout);
         odomListener.unsubscribe();
 
+        if (!message.pose || !message.pose.pose) {
+          reject(new Error("Invalid odometry message"));
+          return;
+        }
+
         const position = message.pose.pose.position;
         const orientation = message.pose.pose.orientation;
+
+        if (!position || !orientation) {
+          reject(new Error("Missing position or orientation"));
+          return;
+        }
 
         // Convert quaternion to yaw
         const siny_cosp =
           2 * (orientation.w * orientation.z + orientation.x * orientation.y);
         const cosy_cosp =
-          1 -
-          2 * (orientation.y * orientation.y + orientation.z * orientation.z);
+          1 - 2 * (orientation.y * orientation.y + orientation.z * orientation.z);
         const theta = Math.atan2(siny_cosp, cosy_cosp);
 
         resolve({

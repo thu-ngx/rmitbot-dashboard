@@ -48,9 +48,10 @@ export function PositionManager({
     try {
       const loadedPositions = await positionService.getPositions();
       setPositions(loadedPositions);
+      console.log("✅ Loaded positions:", loadedPositions);
     } catch (error) {
+      console.error("❌ Failed to load positions:", error);
       toast.error("Failed to load positions");
-      console.error(error);
     } finally {
       setIsLoading(false);
     }
@@ -73,8 +74,8 @@ export function PositionManager({
         toast.error(result.message || "Failed to save position");
       }
     } catch (error) {
+      console.error("❌ Error saving position:", error);
       toast.error("Error saving position");
-      console.error(error);
     } finally {
       setIsSaving(false);
     }
@@ -92,29 +93,27 @@ export function PositionManager({
         toast.error("Failed to delete position");
       }
     } catch (error) {
+      console.error("❌ Error deleting position:", error);
       toast.error("Error deleting position");
-      console.error(error);
     }
   };
 
   const handleNavigateToSingle = async (name: string) => {
     setIsNavigating(true);
     try {
+      console.log(`📍 Navigating to ${name}...`);
       toast.info(`Navigating to ${name}...`);
-      const success = await positionService.navigateToPosition(
-        name,
-        (feedback) => {
-          console.log("Navigation feedback:", feedback);
-        }
-      );
-      if (success) {
+      
+      const result = await positionService.navigateToPosition(name);
+      
+      if (result.success) {
         toast.success(`Reached ${name}`);
       } else {
-        toast.error(`Failed to reach ${name}`);
+        toast.error(`Failed to reach ${name}: ${result.message}`);
       }
     } catch (error) {
+      console.error("❌ Navigation error:", error);
       toast.error("Navigation error");
-      console.error(error);
     } finally {
       setIsNavigating(false);
     }
@@ -131,28 +130,32 @@ export function PositionManager({
     setCurrentNavigatingIndex(0);
 
     try {
+      console.log(`📍 Navigating through ${selectedNames.length} positions...`);
       toast.info(`Navigating through ${selectedNames.length} positions...`);
-      const success = await positionService.navigateThroughPositions(
+      
+      const result = await positionService.navigateThroughPositions(
         selectedNames,
         (feedback) => {
+          console.log("📡 Navigation feedback:", feedback);
           if (feedback.current_index !== undefined) {
             setCurrentNavigatingIndex(feedback.current_index);
             toast.info(
-              `At position ${feedback.current_index + 1}/${
-                selectedNames.length
-              }`
+              `At position ${feedback.current_index + 1}/${selectedNames.length}`
             );
           }
         }
       );
-      if (success) {
-        toast.success("Completed all positions!");
+      
+      if (result.success) {
+        toast.success(
+          `Completed! Reached ${result.positions_reached}/${selectedNames.length} positions`
+        );
       } else {
-        toast.error("Navigation sequence failed");
+        toast.error(`Navigation failed: ${result.message}`);
       }
     } catch (error) {
+      console.error("❌ Navigation error:", error);
       toast.error("Navigation error");
-      console.error(error);
     } finally {
       setIsNavigating(false);
       setCurrentNavigatingIndex(-1);
@@ -170,7 +173,7 @@ export function PositionManager({
   };
 
   return (
-    <Card className="bg-slate-800/30 border-slate-700/50 h-full flex flex-col">
+    <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm h-full flex flex-col">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <CardTitle className="text-sm flex items-center gap-2 text-white">
@@ -189,7 +192,7 @@ export function PositionManager({
               variant="ghost"
               onClick={loadPositions}
               disabled={!isConnected || isLoading}
-              className="h-7 w-7 p-0 hover:bg-slate-700"
+              className="h-7 w-7 p-0 hover:bg-slate-700/50"
             >
               <RefreshCw
                 className={`w-3 h-3 text-slate-300 ${
@@ -218,14 +221,14 @@ export function PositionManager({
             disabled={
               !isConnected || disabled || isSaving || !newPositionName.trim()
             }
-            className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white"
+            className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white border-0 whitespace-nowrap"
           >
             {isSaving ? (
               <RefreshCw className="w-3 h-3 animate-spin" />
             ) : (
               <>
                 <Save className="w-3 h-3 mr-1" />
-                Save
+                <span className="hidden sm:inline">Save</span>
               </>
             )}
           </Button>
@@ -239,27 +242,27 @@ export function PositionManager({
                 size="sm"
                 onClick={handleNavigateSelected}
                 disabled={!isConnected || disabled}
-                className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 text-white"
+                className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 text-white border-0 text-xs"
               >
                 <Play className="w-3 h-3 mr-1" />
-                Navigate Selected ({selectedPositions.size})
+                Navigate ({selectedPositions.size})
               </Button>
             ) : (
               <Button
                 size="sm"
                 variant="destructive"
                 onClick={() => setIsNavigating(false)}
-                className="flex-1 h-8"
+                className="flex-1 h-8 text-xs"
               >
                 <Square className="w-3 h-3 mr-1" />
-                Stop Navigation
+                Stop
               </Button>
             )}
           </div>
         )}
 
         {/* Position List */}
-        <div className="flex-1 overflow-y-auto space-y-2">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
           {positions.length === 0 ? (
             <div className="text-center py-8 text-slate-400 text-xs">
               No saved positions
@@ -288,25 +291,26 @@ export function PositionManager({
                     checked={isSelected}
                     onCheckedChange={() => toggleSelection(pos.name)}
                     disabled={!isConnected || disabled || isNavigating}
-                    className="h-4 w-4 border-slate-500"
+                    className="h-4 w-4 border-slate-500 shrink-0"
                   />
 
                   <div className="flex-1 min-w-0">
                     <div className="text-xs font-medium text-slate-200 truncate">
                       {pos.name}
                     </div>
-                    <div className="text-[10px] text-slate-400">
+                    <div className="text-[10px] text-slate-400 font-mono">
                       x: {pos.x.toFixed(2)}, y: {pos.y.toFixed(2)}, θ:{" "}
                       {pos.theta.toFixed(2)}
                     </div>
                   </div>
 
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity shrink-0">
                     <Button
                       size="sm"
                       onClick={() => handleNavigateToSingle(pos.name)}
                       disabled={!isConnected || disabled || isNavigating}
-                      className="h-6 px-2 bg-blue-600/80 hover:bg-blue-600 text-white text-[10px]"
+                      className="h-7 w-7 p-0 bg-blue-600/80 hover:bg-blue-600 text-white"
+                      title="Navigate to this position"
                     >
                       <Navigation className="w-3 h-3" />
                     </Button>
@@ -315,7 +319,8 @@ export function PositionManager({
                       variant="ghost"
                       onClick={() => handleDeletePosition(pos.name)}
                       disabled={!isConnected || disabled || isNavigating}
-                      className="h-6 w-6 p-0 hover:bg-red-500/20 text-red-400"
+                      className="h-7 w-7 p-0 hover:bg-red-500/20 text-red-400"
+                      title="Delete position"
                     >
                       <Trash2 className="w-3 h-3" />
                     </Button>
