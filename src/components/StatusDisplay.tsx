@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
-import { Gauge, MapPin } from "lucide-react";
+import { Button } from "./ui/button";
+import { Gauge, MapPin, Stethoscope } from "lucide-react";
 import { rosService } from "@/services/ros2Connection";
+import { runFullDiagnostics } from "@/utils/rosDiagnostics";
+import { toast } from "sonner";
 import type { RobotPose, OdometryMessage } from "@/types";
 
 interface StatusDisplayProps {
@@ -15,7 +18,39 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
     theta: 0,
   });
   const [speed, setSpeed] = useState(0);
-  // const [batteryLevel, setBatteryLevel] = useState(85);
+  const [isDiagnosing, setIsDiagnosing] = useState(false);
+
+  const handleDiagnostics = async () => {
+    if (!isConnected) {
+      toast.error("Connect to ROS first");
+      return;
+    }
+
+    setIsDiagnosing(true);
+    toast.info("Running diagnostics...");
+
+    try {
+      const result = await runFullDiagnostics();
+
+      if (result.success) {
+        toast.success("All systems operational!");
+      } else {
+        const missing = [
+          ...result.services.missing,
+          ...result.topics.missing,
+        ];
+        toast.error(
+          `Missing: ${missing.join(", ") || "Unknown error"}`,
+          { duration: 5000 }
+        );
+      }
+    } catch (error) {
+      console.error("Diagnostics error:", error);
+      toast.error("Diagnostics failed");
+    } finally {
+      setIsDiagnosing(false);
+    }
+  };
 
   useEffect(() => {
     if (!isConnected) return;
@@ -72,15 +107,6 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
         console.error("❌ Error processing odometry:", error);
       }
     });
-
-    // Simulate battery drain
-    const batteryInterval = setInterval(() => {
-      setBatteryLevel((prev) => Math.max(0, prev - 0.01));
-    }, 1000);
-
-    return () => {
-      clearInterval(batteryInterval);
-    };
   }, [isConnected]);
 
   return (
@@ -118,30 +144,6 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
             <div className="text-[10px] text-slate-400">m/s</div>
           </div>
 
-          {/* Battery */}
-          {/* <div className="text-center">
-            <div className="flex items-center justify-center gap-1 mb-1">
-              <Battery className="w-3 h-3 text-yellow-400" />
-              <span className="text-[9px] text-slate-400 uppercase">
-                Battery
-              </span>
-            </div>
-            <div
-              className={`text-xl font-bold ${
-                batteryLevel < 20 ? "text-red-500" : "text-yellow-400"
-              }`}
-            >
-              {batteryLevel?.toFixed(0) ?? "0"}%
-            </div>
-            <div className="w-full bg-slate-700 rounded-full h-1 mt-1">
-              <div
-                className={`h-1 rounded-full transition-all ${
-                  batteryLevel < 20 ? "bg-red-500" : "bg-yellow-400"
-                }`}
-                style={{ width: `${batteryLevel}%` }}
-              />
-            </div>
-          </div> */}
         </div>
       </CardContent>
     </Card>

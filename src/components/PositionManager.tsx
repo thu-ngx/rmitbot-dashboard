@@ -137,12 +137,19 @@ export function PositionManager({
         selectedNames,
         (feedback) => {
           console.log("📡 Navigation feedback:", feedback);
-          if (feedback.current_index !== undefined) {
-            setCurrentNavigatingIndex(feedback.current_index);
-            toast.info(
-              `At position ${feedback.current_index + 1}/${selectedNames.length}`
-            );
-          }
+          const currentName = (feedback as any)?.current_position_name as string | undefined;
+
+if (currentName) {
+  const idx = selectedNames.indexOf(currentName);
+  if (idx !== -1) {
+    setCurrentNavigatingIndex(idx);
+    toast.info(`At position ${idx + 1}/${selectedNames.length}: ${currentName}`);
+  } else {
+    // Name not in list (still show something)
+    toast.info(`Navigating: ${currentName}`);
+  }
+}
+
         }
       );
       
@@ -251,7 +258,13 @@ export function PositionManager({
               <Button
                 size="sm"
                 variant="destructive"
-                onClick={() => setIsNavigating(false)}
+                onClick={() => {
+  positionService.cancelNavigation();  // <-- actually cancels ROS action goal
+  setIsNavigating(false);
+  setCurrentNavigatingIndex(-1);
+  toast.info("Navigation cancelled");
+}}
+
                 className="flex-1 h-8 text-xs"
               >
                 <Square className="w-3 h-3 mr-1" />

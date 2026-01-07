@@ -3,14 +3,14 @@ import { rosService } from "./ros2Connection";
 import type { 
   SavedPosition, 
   RobotPose,
-  // NavigatePositionRequest,
-  // NavigateThroughPositionsGoal,
   NavigateThroughPositionsFeedback,
   NavigateThroughPositionsResult
 } from "@/types";
 
 class PositionService {
   private static instance: PositionService;
+  private currentSingleGoal: ROSLIB.Goal | null = null;
+  private currentMultiGoal: ROSLIB.Goal | null = null;
 
   private constructor() {}
 
@@ -21,7 +21,28 @@ class PositionService {
     return PositionService.instance;
   }
 
-  // Save current position
+
+
+  public cancelNavigation(): void {
+    try {
+      if (this.currentSingleGoal) {
+        console.log("🛑 Cancelling single navigation goal...");
+        this.currentSingleGoal.cancel();
+      }
+      if (this.currentMultiGoal) {
+        console.log("🛑 Cancelling multi navigation goal...");
+        this.currentMultiGoal.cancel();
+      }
+    } catch (e) {
+      console.warn("⚠️ Failed to cancel navigation:", e);
+    } finally {
+      this.currentSingleGoal = null;
+      this.currentMultiGoal = null;
+    }
+  }
+
+
+  // Save current position (Service)
   async savePosition(
     name: string
   ): Promise<{ success: boolean; message: string }> {
@@ -29,9 +50,12 @@ class PositionService {
       const ros = rosService.getROS();
 
       if (!rosService.isConnected) {
+        console.error("❌ Cannot save position: ROS not connected");
         reject(new Error("ROS not connected"));
         return;
       }
+
+      console.log(`📍 Attempting to save position: "${name}"`);
 
       const savePositionService = new ROSLIB.Service({
         ros: ros,
@@ -40,33 +64,57 @@ class PositionService {
       });
 
       const request = { name };
+      console.log("📤 Sending save request:", request);
+
+      // Add timeout for service call
+      let responded = false;
+      const timeout = setTimeout(() => {
+        if (!responded) {
+          console.error("⏱️ Save position service timeout (no response in 10s)");
+          reject(new Error("Service call timeout - is the ROS2 node running?"));
+        }
+      }, 10000);
 
       savePositionService.callService(
         request,
         (response: any) => {
-          console.log("✅ Position saved:", response);
+          responded = true;
+          clearTimeout(timeout);
+          console.log("✅ Save position response:", response);
+
+          if (response.success) {
+            console.log(`✅ Position "${name}" saved successfully`);
+          } else {
+            console.warn(`⚠️ Save failed: ${response.message}`);
+          }
+
           resolve({
             success: response.success,
-            message: response.message,
+            message: response.message || "Unknown response",
           });
         },
         (error: any) => {
-          console.error("❌ Save position failed:", error);
+          responded = true;
+          clearTimeout(timeout);
+          console.error("❌ Save position service error:", error);
           reject(error);
         }
       );
     });
   }
 
-  // Get all positions
+  // Get all positions (Service)
   async getPositions(): Promise<SavedPosition[]> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
       if (!rosService.isConnected) {
+        console.error("❌ Cannot get positions: ROS not connected");
         reject(new Error("ROS not connected"));
         return;
       }
+
+      console.log("📍 Fetching saved positions...");
 
       const getPositionsService = new ROSLIB.Service({
         ros: ros,
@@ -76,31 +124,53 @@ class PositionService {
 
       const request = {};
 
+      // Add timeout
+      let responded = false;
+      const timeout = setTimeout(() => {
+        if (!responded) {
+          console.error("⏱️ Get positions service timeout (no response in 10s)");
+          reject(new Error("Service call timeout - is the ROS2 node running?"));
+        }
+      }, 10000);
+
       getPositionsService.callService(
         request,
         (response: any) => {
-          console.log("✅ Positions loaded:", response);
+          responded = true;
+          clearTimeout(timeout);
+          console.log("✅ Get positions response:", response);
+
+          // Validate response structure
+          if (!response.names || !Array.isArray(response.names)) {
+            console.error("❌ Invalid response structure:", response);
+            reject(new Error("Invalid response from get_positions service"));
+            return;
+          }
+
           const positions: SavedPosition[] = response.names.map(
             (name: string, index: number) => ({
               id: `pos-${index}`,
               name,
-              x: response.x_coords[index],
-              y: response.y_coords[index],
-              theta: response.theta_coords[index],
+              x: response.x_coords[index] || 0,
+              y: response.y_coords[index] || 0,
+              theta: response.theta_coords[index] || 0,
               timestamp: Date.now(),
             })
           );
+          console.log(`✅ Loaded ${positions.length} positions`);
           resolve(positions);
         },
         (error: any) => {
-          console.error("❌ Get positions failed:", error);
+          responded = true;
+          clearTimeout(timeout);
+          console.error("❌ Get positions service error:", error);
           reject(error);
         }
       );
     });
   }
 
-  // Delete position
+  // Delete position (Service)
   async deletePosition(name: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
@@ -132,8 +202,10 @@ class PositionService {
     });
   }
 
-  // Navigate to single position (service)
-  async navigateToPosition(name: string): Promise<{ success: boolean; message: string }> {
+  async navigateToPosition(
+    name: string,
+    onFeedback?: (status: string) => void
+  ): Promise<{ success: boolean; message: string }> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
@@ -141,107 +213,181 @@ class PositionService {
         reject(new Error("ROS not connected"));
         return;
       }
-
-      console.log(`📍 Navigating to position: ${name}`);
-
-      const navigateService = new ROSLIB.Service({
-        ros: ros,
-        name: "/navigate_to_position",
-        serviceType: "position_manager_msgs/srv/NavigateToPosition",
-      });
-
-      const request = { position_name: name };
-
-      const timeout = setTimeout(() => {
-        reject(new Error("Navigation timeout"));
-      }, 360000); // 6 minutes
-
-      navigateService.callService(
-        request,
-        (response: any) => {
-          clearTimeout(timeout);
-          console.log("✅ Navigation result:", response);
-          resolve({
-            success: response.success,
-            message: response.message,
-          });
-        },
-        (error: any) => {
-          clearTimeout(timeout);
-          console.error("❌ Navigation failed:", error);
-          reject(error);
-        }
-      );
-    });
-  }
-
-  // Navigate through multiple positions (ACTION)
-  async navigateThroughPositions(
-    names: string[],
-    onFeedback?: (feedback: NavigateThroughPositionsFeedback) => void
-  ): Promise<NavigateThroughPositionsResult> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
-
-      if (!rosService.isConnected) {
-        reject(new Error("ROS not connected"));
-        return;
-      }
-
-      console.log(`📍 Navigating through ${names.length} positions:`, names);
 
       const actionClient = new ROSLIB.ActionClient({
-        ros: ros,
-        serverName: "/navigate_through_positions",
-        actionName: "position_manager_msgs/action/NavigatePositions",
+        ros,
+        serverName: "/navigate_to_position",
+        actionName: "position_manager_msgs/action/NavigateToPosition",
       });
 
-      // Wait for action server
-      const checkServer = setInterval(() => {
-        if (actionClient.isServerReady()) {
-          clearInterval(checkServer);
-          
-          const goal = new ROSLIB.Goal({
-            actionClient: actionClient,
-            goalMessage: { position_names: names },
-          });
+      let finished = false;
+      let gotAnyResponse = false;
 
-          goal.on("feedback", (feedback: any) => {
-            console.log("📡 Navigation feedback:", feedback);
-            if (onFeedback) {
-              onFeedback(feedback);
-            }
-          });
+      const goal = new ROSLIB.Goal({
+        actionClient,
+        goalMessage: { position_name: name },
+      });
 
-          goal.on("result", (result: any) => {
-            console.log("✅ Navigation complete:", result);
-            resolve({
-              success: result.success,
-              message: result.message,
-              positions_reached: result.positions_reached,
-            });
-          });
+      // Store for Stop/cancel
+      this.currentSingleGoal = goal;
 
-          goal.on("cancel", () => {
-            console.log("⛔ Navigation cancelled");
-            reject(new Error("Navigation cancelled"));
-          });
+      const cleanup = () => {
+        if (finished) return;
+        finished = true;
+        this.currentSingleGoal = null;
+        try {
+          actionClient.dispose();
+        } catch {}
+      };
 
-          goal.send();
+      // "server not responding" guard (replaces isServerReady)
+      const serverResponseTimeout = setTimeout(() => {
+        if (finished) return;
+        if (!gotAnyResponse) {
+          console.warn("⚠️ No feedback/status from action server; cancelling goal");
+          try { goal.cancel(); } catch {}
+          cleanup();
+          reject(new Error("Action server not responding (no feedback/status within 5s)"));
         }
-      }, 100);
-
-      setTimeout(() => {
-        clearInterval(checkServer);
-        reject(new Error("Action server not ready"));
       }, 5000);
+
+      // Overall navigation timeout (optional; keep yours)
+      const navigationTimeout = setTimeout(() => {
+        if (finished) return;
+        console.warn("⚠️ Navigation timeout; cancelling...");
+        try { goal.cancel(); } catch {}
+        cleanup();
+        reject(new Error("Navigation timeout after 6 minutes"));
+      }, 360000);
+
+      goal.on("feedback", (feedback: any) => {
+        gotAnyResponse = true;
+        if (onFeedback && feedback?.current_position_name) {
+          onFeedback(`Navigating to ${feedback.current_position_name}...`);
+        }
+      });
+
+      goal.on("status", () => {
+        gotAnyResponse = true;
+      });
+
+      goal.on("result", (result: any) => {
+        gotAnyResponse = true;
+        clearTimeout(serverResponseTimeout);
+        clearTimeout(navigationTimeout);
+
+        const success = !!result?.success;
+        cleanup();
+        resolve({
+          success,
+          message:
+            result?.message || (success ? `Arrived at ${name}` : "Navigation failed"),
+        });
+      });
+
+      goal.on("cancel", () => {
+        clearTimeout(serverResponseTimeout);
+        clearTimeout(navigationTimeout);
+        cleanup();
+        reject(new Error("Navigation cancelled"));
+      });
+
+      goal.send();
+      if (onFeedback) onFeedback("Goal sent to robot...");
     });
   }
+
+
+  // Navigate through multiple positions (ACTION)
+async navigateThroughPositions(
+  names: string[],
+  onFeedback?: (feedback: NavigateThroughPositionsFeedback) => void
+): Promise<NavigateThroughPositionsResult> {
+  return new Promise((resolve, reject) => {
+    const ros = rosService.getROS();
+
+    if (!rosService.isConnected) {
+      reject(new Error("ROS not connected"));
+      return;
+    }
+
+    const actionClient = new ROSLIB.ActionClient({
+      ros,
+      serverName: "/navigate_positions",
+      actionName: "position_manager_msgs/action/NavigatePositions",
+    });
+
+    let finished = false;
+    let gotAnyResponse = false;
+
+    const goal = new ROSLIB.Goal({
+      actionClient,
+      goalMessage: { position_names: names },
+    });
+
+    // Store for Stop/cancel
+    this.currentMultiGoal = goal;
+
+    const cleanup = () => {
+      if (finished) return;
+      finished = true;
+      this.currentMultiGoal = null;
+      try {
+        actionClient.dispose();
+      } catch {}
+    };
+
+    const serverResponseTimeout = setTimeout(() => {
+      if (finished) return;
+      if (!gotAnyResponse) {
+        console.warn("⚠️ No feedback/status from action server; cancelling goal");
+        try { goal.cancel(); } catch {}
+        cleanup();
+        reject(new Error("Action server not responding (no feedback/status within 5s)"));
+      }
+    }, 5000);
+
+    goal.on("feedback", (feedback: any) => {
+      gotAnyResponse = true;
+      if (onFeedback) onFeedback(feedback);
+    });
+
+    goal.on("status", () => {
+      gotAnyResponse = true;
+    });
+
+    goal.on("result", (result: any) => {
+      gotAnyResponse = true;
+      clearTimeout(serverResponseTimeout);
+      cleanup();
+      resolve({
+        success: !!result?.success,
+        message: result?.message ?? "",
+        positions_reached: result?.positions_reached ?? 0,
+      });
+    });
+
+    goal.on("cancel", () => {
+      clearTimeout(serverResponseTimeout);
+      cleanup();
+      reject(new Error("Multi-navigation cancelled"));
+    });
+
+    // Send immediately
+    goal.send();
+  });
+}
+
 
   // Get current robot pose from /odom
   async getCurrentPose(): Promise<RobotPose> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
+
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
+      }
 
       const odomListener = new ROSLIB.Topic({
         ros: ros,

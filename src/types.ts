@@ -41,7 +41,7 @@ export interface TwistStampedMessage {
 export interface OdometryMessage {
   header: {
     seq?: number;
-    stamp: { sec: number; nsec: number };
+    stamp: { sec: number; nanosec: number };
     frame_id: string;
   };
   child_frame_id: string;
@@ -55,31 +55,31 @@ export interface OdometryMessage {
   twist: {
     twist: {
       linear: { x: number; y: number; z: number };
-      angular: { x: number; y: number; z: number };  
+      angular: { x: number; y: number; z: number };
     };
     covariance?: number[];
   };
 }
 
-export interface NavigatePositionRequest {
+export interface NavigateToPositionGoal {
   position_name: string;
 }
-
-export interface NavigatePositionResponse {
+export interface NavigateToPositionResult {
   success: boolean;
   message: string;
+}
+export interface NavigateToPositionFeedback {
+  status?: string; 
 }
 
 export interface NavigateThroughPositionsGoal {
   position_names: string[];
 }
-
 export interface NavigateThroughPositionsFeedback {
-  current_index: number;
+  current_position_index: number;
   current_position_name: string;
   progress_percentage: number;
 }
-
 export interface NavigateThroughPositionsResult {
   success: boolean;
   message: string;
