@@ -25,15 +25,18 @@ export default function App() {
   };
 
   const handleCommand = (cmd: string) => {
+    console.log("Button clicked:", cmd);
     if (!robot.isConnected) return toast.error("Robot Offline");
     if (robot.mode === "autonomous")
       return toast.error("Switch to Manual Mode");
 
     switch (cmd) {
       case "forward":
+        console.log("Moving forward");
         robot.move(1.0, 0, 0);
         break;
       case "backward":
+        console.log("Moving backward");
         robot.move(-1.0, 0, 0);
         break;
       case "left":
@@ -101,21 +104,23 @@ export default function App() {
       {/* Header */}
       <div className="border-b border-slate-800/50 bg-slate-900/30 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-3 max-w-7xl flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <h1 className="text-lg font-bold text-white">
+          <div className="flex items-center gap-2 md:gap-3">
+            <h1 className="text-sm md:text-lg font-bold text-white">
               Robot Control Panel
             </h1>
             <Badge
               variant="outline"
-              className="text-xs text-slate-300 border-slate-600"
+              className="text-[10px] md:text-xs text-slate-300 border-slate-600 hidden sm:inline-flex"
             >
               {ROS_CONFIG.TARGET.toUpperCase()} ({ROS_CONFIG.IP})
             </Badge>
           </div>
 
           <div className="flex items-center gap-2">
-            <Wifi className={`w-4 h-4 ${getStatusColor()}`} />
-            <span className={`text-xs font-bold ${getStatusColor()}`}>
+            <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${getStatusColor()}`} />
+            <span
+              className={`text-[10px] md:text-xs font-bold ${getStatusColor()}`}
+            >
               {getStatusText()}
             </span>
             <Switch
@@ -126,24 +131,24 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Content - Position Manager Left, Status + Control Right */}
+      {/* Main Content - Responsive Grid */}
       <div className="container mx-auto px-4 py-4 max-w-7xl">
-        <div className="grid grid-cols-12 gap-4 h-[calc(100vh-120px)]">
-          {/* Left Column: Position Manager */}
-          <div className="col-span-8">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[calc(100vh-120px)]">
+          {/* Left Column: Position Manager - Full width on mobile, 8 cols on desktop */}
+          <div className="lg:col-span-8">
             <PositionManager
               isConnected={robot.isConnected}
               disabled={robot.mode === "autonomous"}
             />
           </div>
 
-          {/* Right Column: Status + Control + Quick Start */}
-          <div className="col-span-4 flex flex-col gap-4">
+          {/* Right Column: Status + Control - Full width on mobile, 4 cols on desktop */}
+          <div className="lg:col-span-4 flex flex-col gap-4">
             {/* Status Display */}
             <StatusDisplay isConnected={robot.isConnected} />
 
             {/* Manual Control Card */}
-            <Card className="bg-slate-800/30 border-slate-700/50 p-4">
+            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
               <div className="flex items-center justify-between mb-3">
                 <h2 className="text-sm font-semibold flex items-center gap-2 text-white">
                   <Settings className="w-4 h-4" />
@@ -162,15 +167,15 @@ export default function App() {
               </div>
 
               {/* Mode Switcher */}
-              <div className="flex gap-2 mb-4">
+              <div className="grid grid-cols-2 gap-2 mb-4">
                 <Button
                   size="sm"
                   variant={robot.mode === "manual" ? "default" : "outline"}
                   onClick={() => robot.setMode("manual")}
-                  className={`flex-1 h-9 ${
+                  className={`h-9 ${
                     robot.mode === "manual"
-                      ? "bg-purple-600 hover:bg-purple-700"
-                      : "border-slate-600 text-slate-300"
+                      ? "bg-purple-600 hover:bg-purple-700 border-0"
+                      : "border-slate-600 text-slate-300 hover:bg-slate-800/50"
                   }`}
                 >
                   <Hand className="w-3 h-3 mr-2" /> Manual
@@ -179,10 +184,10 @@ export default function App() {
                   size="sm"
                   variant={robot.mode === "autonomous" ? "default" : "outline"}
                   onClick={() => robot.setMode("autonomous")}
-                  className={`flex-1 h-9 ${
+                  className={`h-9 ${
                     robot.mode === "autonomous"
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "border-slate-600 text-slate-300"
+                      ? "bg-blue-600 hover:bg-blue-700 border-0"
+                      : "border-slate-600 text-slate-300 hover:bg-slate-800/50"
                   }`}
                 >
                   <Navigation2 className="w-3 h-3 mr-2" /> Autonomous
@@ -209,28 +214,17 @@ export default function App() {
             </Card>
 
             {/* Quick Start Guide */}
-            <Card className="bg-slate-800/30 border-slate-700/50 p-4">
+            <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
               <h2 className="text-sm font-semibold mb-3 text-white">
                 Quick Start
               </h2>
-              <ol className="text-slate-300 space-y-2 list-decimal list-inside text-xs">
+              <ol className="text-slate-400 space-y-2 list-decimal list-inside text-xs">
                 <li>Drive robot to a location</li>
                 <li>Save position with a name</li>
                 <li>Select positions to navigate</li>
                 <li>View visualization in Foxglove</li>
               </ol>
             </Card>
-
-            {/* Emergency Stop */}
-            {/* <Button
-              className="w-full bg-red-600 hover:bg-red-700 font-bold h-12"
-              onClick={() => {
-                robot.move(0, 0, 0);
-                toast.error("EMERGENCY STOP");
-              }}
-            >
-              <AlertOctagon className="w-5 h-5 mr-2" /> EMERGENCY STOP
-            </Button> */}
           </div>
         </div>
       </div>

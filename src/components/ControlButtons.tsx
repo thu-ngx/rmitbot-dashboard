@@ -1,24 +1,27 @@
-import { Button } from './ui/button';
-import { 
-  ArrowUp, 
-  ArrowDown, 
-  ArrowLeft, 
-  ArrowRight, 
-  RotateCcw, 
+import { Button } from "./ui/button";
+import {
+  ArrowUp,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  RotateCcw,
   RotateCw,
   Square,
   MoveUpRight,
   MoveUpLeft,
   MoveDownRight,
-  MoveDownLeft
-} from 'lucide-react';
+  MoveDownLeft,
+} from "lucide-react";
 
 interface ControlButtonsProps {
   onCommand: (command: string) => void;
   disabled?: boolean;
 }
 
-export function ControlButtons({ onCommand, disabled = false }: ControlButtonsProps) {
+export function ControlButtons({
+  onCommand,
+  disabled = false,
+}: ControlButtonsProps) {
   return (
     <div className="space-y-2">
       {/* Directional Controls with Diagonals */}
@@ -26,7 +29,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('forward-left')}
+          onClick={() => onCommand("forward-left")}
           disabled={disabled}
           className="h-11 bg-purple-600/80 hover:bg-purple-700 text-white border-0"
         >
@@ -35,7 +38,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('forward')}
+          onClick={() => onCommand("forward")}
           disabled={disabled}
           className="h-11 bg-blue-600/80 hover:bg-blue-700 text-white border-0"
         >
@@ -44,17 +47,17 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('forward-right')}
+          onClick={() => onCommand("forward-right")}
           disabled={disabled}
           className="h-11 bg-purple-600/80 hover:bg-purple-700 text-white border-0"
         >
           <MoveUpRight className="w-4 h-4" />
         </Button>
-        
+
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('left')}
+          onClick={() => onCommand("left")}
           disabled={disabled}
           className="h-11 bg-blue-600/80 hover:bg-blue-700 text-white border-0"
         >
@@ -63,7 +66,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="destructive"
-          onClick={() => onCommand('stop')}
+          onClick={() => onCommand("stop")}
           disabled={disabled}
           className="h-11"
         >
@@ -72,17 +75,17 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('right')}
+          onClick={() => onCommand("right")}
           disabled={disabled}
           className="h-11 bg-blue-600/80 hover:bg-blue-700 text-white border-0"
         >
           <ArrowRight className="w-4 h-4" />
         </Button>
-        
+
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('backward-left')}
+          onClick={() => onCommand("backward-left")}
           disabled={disabled}
           className="h-11 bg-purple-600/80 hover:bg-purple-700 text-white border-0"
         >
@@ -91,7 +94,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('backward')}
+          onClick={() => onCommand("backward")}
           disabled={disabled}
           className="h-11 bg-blue-600/80 hover:bg-blue-700 text-white border-0"
         >
@@ -100,7 +103,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('backward-right')}
+          onClick={() => onCommand("backward-right")}
           disabled={disabled}
           className="h-11 bg-purple-600/80 hover:bg-purple-700 text-white border-0"
         >
@@ -113,7 +116,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('rotate-left')}
+          onClick={() => onCommand("rotate-left")}
           disabled={disabled}
           className="h-8 bg-indigo-600/80 hover:bg-indigo-700 text-white border-0 text-[10px]"
         >
@@ -123,7 +126,7 @@ export function ControlButtons({ onCommand, disabled = false }: ControlButtonsPr
         <Button
           size="sm"
           variant="secondary"
-          onClick={() => onCommand('rotate-right')}
+          onClick={() => onCommand("rotate-right")}
           disabled={disabled}
           className="h-8 bg-indigo-600/80 hover:bg-indigo-700 text-white border-0 text-[10px]"
         >

@@ -24,7 +24,7 @@ class PositionService {
       const savePositionService = new ROSLIB.Service({
         ros: ros,
         name: "/save_position",
-        serviceType: "position_manager/SavePosition",
+        serviceType: "position_manager_msgs/srv/SavePosition",
       });
 
       const request = { name };
@@ -45,15 +45,19 @@ class PositionService {
     });
   }
 
-  // Get all saved positions
   async getPositions(): Promise<SavedPosition[]> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
+      }
+
       const getPositionsService = new ROSLIB.Service({
         ros: ros,
         name: "/get_positions",
-        serviceType: "position_manager/GetPositions",
+        serviceType: "position_manager_msgs/srv/GetPositions",
       });
 
       const request = {};
@@ -81,7 +85,6 @@ class PositionService {
     });
   }
 
-  // Delete a position
   async deletePosition(name: string): Promise<boolean> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
@@ -89,7 +92,7 @@ class PositionService {
       const deletePositionService = new ROSLIB.Service({
         ros: ros,
         name: "/delete_position",
-        serviceType: "position_manager/DeletePosition",
+        serviceType: "position_manager_msgs/srv/DeletePosition",
       });
 
       const request = { name };
@@ -118,7 +121,7 @@ class PositionService {
       const navigateToPositionAction = new ROSLIB.ActionClient({
         ros: ros,
         serverName: "/navigate_to_position",
-        actionName: "position_manager/NavigateToPosition",
+        actionName: "position_manager/srv/NavigateToPosition",
       });
 
       const goal = new ROSLIB.Goal({
@@ -149,7 +152,7 @@ class PositionService {
       const navigateThroughAction = new ROSLIB.ActionClient({
         ros: ros,
         serverName: "/navigate_through_positions",
-        actionName: "position_manager/NavigateThroughPositions",
+        actionName: "position_manager/srv/NavigateThroughPositions",
       });
 
       const goal = new ROSLIB.Goal({

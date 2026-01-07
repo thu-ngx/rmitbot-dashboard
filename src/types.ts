@@ -30,6 +30,14 @@ export interface TwistMessage {
   angular: { x: number; y: number; z: number };
 }
 
+export interface TwistStampedMessage {
+  header: {
+    stamp: { sec: number; nanosec: number };
+    frame_id: string;
+  };
+  twist: TwistMessage;
+}
+
 export interface OdometryMessage {
   pose: {
     pose: {
