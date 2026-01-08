@@ -1,10 +1,7 @@
 import { useEffect, useState } from "react";
 import { Card, CardContent } from "./ui/card";
-import { Button } from "./ui/button";
-import { Gauge, MapPin, Stethoscope } from "lucide-react";
+import { Gauge, MapPin } from "lucide-react";
 import { rosService } from "@/services/ros2Connection";
-import { runFullDiagnostics } from "@/utils/rosDiagnostics";
-import { toast } from "sonner";
 import type { RobotPose, OdometryMessage } from "@/types";
 
 interface StatusDisplayProps {
@@ -18,56 +15,13 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
     theta: 0,
   });
   const [speed, setSpeed] = useState(0);
-  const [isDiagnosing, setIsDiagnosing] = useState(false);
-
-  const handleDiagnostics = async () => {
-    if (!isConnected) {
-      toast.error("Connect to ROS first");
-      return;
-    }
-
-    setIsDiagnosing(true);
-    toast.info("Running diagnostics...");
-
-    try {
-      const result = await runFullDiagnostics();
-
-      if (result.success) {
-        toast.success("All systems operational!");
-      } else {
-        const missing = [
-          ...result.services.missing,
-          ...result.topics.missing,
-        ];
-        toast.error(
-          `Missing: ${missing.join(", ") || "Unknown error"}`,
-          { duration: 5000 }
-        );
-      }
-    } catch (error) {
-      console.error("Diagnostics error:", error);
-      toast.error("Diagnostics failed");
-    } finally {
-      setIsDiagnosing(false);
-    }
-  };
 
   useEffect(() => {
     if (!isConnected) return;
 
-    console.log("📡 Subscribing to /odom topic...");
-
     // Subscribe to odometry updates from ROS2
     rosService.setOdomCallback((data: OdometryMessage) => {
-      console.log("✅ Odometry data received:", data);
-
-      if (!data) {
-        console.warn("⚠️ Received null odometry message");
-        return;
-      }
-
-      if (!data.pose || !data.pose.pose) {
-        console.warn("⚠️ Odometry missing pose structure");
+      if (!data || !data.pose || !data.pose.pose) {
         return;
       }
 
@@ -75,7 +29,6 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
       const orientation = data.pose?.pose?.orientation;
 
       if (!position || !orientation) {
-        console.warn("⚠️ Odometry missing position or orientation");
         return;
       }
 
@@ -94,14 +47,11 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
           theta: theta,
         });
 
-        console.log("✅ Updated pose:", { x: position.x, y: position.y, theta });
-
         // Calculate speed from linear velocity
         if (data.twist?.twist?.linear) {
           const linearVel = data.twist.twist.linear;
           const speed = Math.sqrt(linearVel.x ** 2 + linearVel.y ** 2);
           setSpeed(speed);
-          console.log("✅ Updated speed:", speed);
         }
       } catch (error) {
         console.error("❌ Error processing odometry:", error);

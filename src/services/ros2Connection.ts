@@ -27,35 +27,32 @@ class RosService {
   }
 
   private setupListeners() {
-  this.ros.on("connection", () => {
-    console.log("✅ Connected to ROS WebSocket!");
-    this.isConnected = true;
-    this.isIntentionalDisconnect = false;
+    this.ros.on("connection", () => {
+      console.log("✅ Connected to ROS");
+      this.isConnected = true;
+      this.isIntentionalDisconnect = false;
 
-    // Add a small delay to ensure WebSocket is fully ready to send data
-    setTimeout(() => {
-      console.log("🔧 Initializing publishers and subscribers...");
-      this.initPublishers();
-      this.initSubscribers();
-    }, 500);
-  });
+      setTimeout(() => {
+        this.initPublishers();
+        this.initSubscribers();
+      }, 500);
+    });
 
-  this.ros.on("close", () => {
-    console.log("❌ Disconnected from ROS WebSocket");
-    this.isConnected = false;
-    this.cmdVelPublisher = null;
-    this.odomSubscriber = null;
+    this.ros.on("close", () => {
+      console.log("❌ Disconnected from ROS");
+      this.isConnected = false;
+      this.cmdVelPublisher = null;
+      this.odomSubscriber = null;
 
-    if (!this.isIntentionalDisconnect) {
-      console.log("🔄 Attempting to reconnect...");
-      setTimeout(() => this.connect(), this.reconnectInterval);
-    }
-  });
+      if (!this.isIntentionalDisconnect) {
+        setTimeout(() => this.connect(), this.reconnectInterval);
+      }
+    });
 
-  this.ros.on("error", (error) => {
-    console.error("⚠️ ROS WebSocket Error:", error);
-  });
-}
+    this.ros.on("error", (error) => {
+      console.error("⚠️ ROS Error:", error);
+    });
+  }
 
   private initPublishers() {
     this.cmdVelPublisher = new ROSLIB.Topic({
@@ -66,8 +63,6 @@ class RosService {
   }
 
   private initSubscribers() {
-    console.log("📡 Creating /odom subscriber...");
-
     this.odomSubscriber = new ROSLIB.Topic({
       ros: this.ros,
       name: "/odom",
@@ -75,26 +70,17 @@ class RosService {
     });
 
     try {
-      console.log("📡 Subscribing to /odom...");
       this.odomSubscriber.subscribe((message: any) => {
-        console.log("✅ Odometry received (raw):", {
-          pose: message.pose?.pose?.position,
-          twist: message.twist?.twist?.linear,
-        });
-
         if (this.odomCallback) {
           this.odomCallback(message as OdometryMessage);
         }
       });
-
-      console.log("✅ Successfully subscribed to /odom");
     } catch (error) {
       console.error("❌ Subscriber init failed:", error);
     }
   }
 
   public setOdomCallback(callback: (data: OdometryMessage) => void) {
-    console.log("🔗 Setting odometry callback");
     this.odomCallback = callback;
   }
 
@@ -103,24 +89,11 @@ class RosService {
     linear_y: number,
     angular_z: number
   ) {
-    if (!this.isConnected || !this.cmdVelPublisher) {
-      console.warn(
-        "⚠️ Cannot publish: connected=",
-        this.isConnected,
-        "publisher=",
-        !!this.cmdVelPublisher
-      );
-      return;
-    }
-
-    const stamp = {
-      sec: 0,
-      nanosec: 0,
-    };
+    if (!this.isConnected || !this.cmdVelPublisher) return;
 
     const twistStamped: TwistStampedMessage = {
       header: {
-        stamp: stamp,
+        stamp: { sec: 0, nanosec: 0 },
         frame_id: "base_footprint",
       },
       twist: {
@@ -131,12 +104,6 @@ class RosService {
 
     try {
       this.cmdVelPublisher.publish(twistStamped);
-      if (linear_x !== 0 || linear_y !== 0 || angular_z !== 0) {
-        console.log(
-          "✅ Published TwistStamped to /cmd_vel_keyboard:",
-          twistStamped
-        );
-      }
     } catch (error) {
       console.error("❌ Publish failed:", error);
     }

@@ -25,18 +25,15 @@ export default function App() {
   };
 
   const handleCommand = (cmd: string) => {
-    console.log("Button clicked:", cmd);
     if (!robot.isConnected) return toast.error("Robot Offline");
     if (robot.mode === "autonomous")
       return toast.error("Switch to Manual Mode");
 
     switch (cmd) {
       case "forward":
-        console.log("Moving forward");
         robot.move(1.0, 0, 0);
         break;
       case "backward":
-        console.log("Moving backward");
         robot.move(-1.0, 0, 0);
         break;
       case "left":
@@ -66,8 +63,6 @@ export default function App() {
       case "rotate-right":
         robot.move(0, 0, -1.0);
         break;
-      default:
-        console.log("Unknown command", cmd);
     }
   };
 
@@ -147,70 +142,63 @@ export default function App() {
             {/* Status Display */}
             <StatusDisplay isConnected={robot.isConnected} />
 
-            {/* Manual Control Card */}
+            {/* Control Card */}
             <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-semibold flex items-center gap-2 text-white">
-                  <Settings className="w-4 h-4" />
-                  Manual Control
-                </h2>
-                <Badge
-                  variant={robot.mode === "manual" ? "default" : "outline"}
-                  className={`text-xs ${
-                    robot.mode === "manual"
-                      ? "bg-blue-600 text-white"
-                      : "text-slate-300 border-slate-600"
-                  }`}
-                >
-                  {robot.mode === "manual" ? "Active" : "Disabled"}
-                </Badge>
-              </div>
-
-              {/* Mode Switcher */}
-              <div className="grid grid-cols-2 gap-2 mb-4">
-                <Button
-                  size="sm"
-                  variant={robot.mode === "manual" ? "default" : "outline"}
-                  onClick={() => robot.setMode("manual")}
-                  className={`h-9 ${
-                    robot.mode === "manual"
-                      ? "bg-purple-600 hover:bg-purple-700 border-0"
-                      : "border-slate-600 text-slate-300 hover:bg-slate-800/50"
-                  }`}
-                >
-                  <Hand className="w-3 h-3 mr-2" /> Manual
-                </Button>
-                <Button
-                  size="sm"
-                  variant={robot.mode === "autonomous" ? "default" : "outline"}
-                  onClick={() => robot.setMode("autonomous")}
-                  className={`h-9 ${
-                    robot.mode === "autonomous"
-                      ? "bg-blue-600 hover:bg-blue-700 border-0"
-                      : "border-slate-600 text-slate-300 hover:bg-slate-800/50"
-                  }`}
-                >
-                  <Navigation2 className="w-3 h-3 mr-2" /> Autonomous
-                </Button>
-              </div>
-
-              {/* Speed Display and Control */}
-              <div className="text-center mb-4">
-                <div className="text-2xl font-bold text-blue-400 mb-2">
-                  {robot.speed.toFixed(2)} m/s
+              {/* Mode Toggle */}
+              <div className="flex items-center justify-between mb-4">
+                <div className="flex items-center gap-2">
+                  <Settings className="w-4 h-4 text-slate-400" />
+                  <span className="text-sm font-medium text-slate-300">Mode</span>
                 </div>
-                <SpeedControl
-                  selectedMode={speedMode}
-                  onModeChange={handleSpeedChange}
-                  disabled={robot.mode === "autonomous"}
+                <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1">
+                  <Button
+                    size="sm"
+                    variant={robot.mode === "manual" ? "default" : "ghost"}
+                    onClick={() => robot.setMode("manual")}
+                    className={`h-8 px-3 ${
+                      robot.mode === "manual"
+                        ? "bg-purple-600 hover:bg-purple-700 text-white"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                    }`}
+                  >
+                    <Hand className="w-3 h-3 mr-1.5" />
+                    Manual
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant={robot.mode === "autonomous" ? "default" : "ghost"}
+                    onClick={() => robot.setMode("autonomous")}
+                    className={`h-8 px-3 ${
+                      robot.mode === "autonomous"
+                        ? "bg-blue-600 hover:bg-blue-700 text-white"
+                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
+                    }`}
+                  >
+                    <Navigation2 className="w-3 h-3 mr-1.5" />
+                    Auto
+                  </Button>
+                </div>
+              </div>
+
+              {/* Speed Control */}
+              <h2 className="text-sm font-semibold mb-3 text-white">
+                Speed Control
+              </h2>
+              <SpeedControl
+                selectedMode={speedMode}
+                onModeChange={handleSpeedChange}
+                disabled={robot.mode === "autonomous"}
+              />
+
+              <div className="mt-4">
+                <h2 className="text-sm font-semibold mb-3 text-white">
+                  Movement Controls
+                </h2>
+                <ControlButtons
+                  onCommand={handleCommand}
+                  disabled={!robot.isConnected || robot.mode === "autonomous"}
                 />
               </div>
-
-              {/* Control Buttons */}
-              <ControlButtons
-                onCommand={handleCommand}
-                disabled={!robot.isConnected || robot.mode === "autonomous"}
-              />
             </Card>
 
             {/* Quick Start Guide */}
@@ -218,7 +206,7 @@ export default function App() {
               <h2 className="text-sm font-semibold mb-3 text-white">
                 Quick Start
               </h2>
-              <ol className="text-slate-400 space-y-2 list-decimal list-inside text-xs">
+              <ol className="text-slate-400 space-y-2 list-decimal list-inside text-xs md:text-sm">
                 <li>Drive robot to a location</li>
                 <li>Save position with a name</li>
                 <li>Select positions to navigate</li>

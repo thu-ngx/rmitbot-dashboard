@@ -44,13 +44,14 @@ export function PositionManager({
   }, [isConnected]);
 
   const loadPositions = async () => {
+    if (!isConnected) return;
+
     setIsLoading(true);
     try {
       const loadedPositions = await positionService.getPositions();
       setPositions(loadedPositions);
-      console.log("✅ Loaded positions:", loadedPositions);
     } catch (error) {
-      console.error("❌ Failed to load positions:", error);
+      console.error("Failed to load positions:", error);
       toast.error("Failed to load positions");
     } finally {
       setIsLoading(false);
@@ -74,7 +75,7 @@ export function PositionManager({
         toast.error(result.message || "Failed to save position");
       }
     } catch (error) {
-      console.error("❌ Error saving position:", error);
+      console.error("Error saving position:", error);
       toast.error("Error saving position");
     } finally {
       setIsSaving(false);
@@ -101,18 +102,17 @@ export function PositionManager({
   const handleNavigateToSingle = async (name: string) => {
     setIsNavigating(true);
     try {
-      console.log(`📍 Navigating to ${name}...`);
       toast.info(`Navigating to ${name}...`);
-      
+
       const result = await positionService.navigateToPosition(name);
-      
+
       if (result.success) {
         toast.success(`Reached ${name}`);
       } else {
         toast.error(`Failed to reach ${name}: ${result.message}`);
       }
     } catch (error) {
-      console.error("❌ Navigation error:", error);
+      console.error("Navigation error:", error);
       toast.error("Navigation error");
     } finally {
       setIsNavigating(false);
@@ -130,29 +130,25 @@ export function PositionManager({
     setCurrentNavigatingIndex(0);
 
     try {
-      console.log(`📍 Navigating through ${selectedNames.length} positions...`);
       toast.info(`Navigating through ${selectedNames.length} positions...`);
-      
+
       const result = await positionService.navigateThroughPositions(
         selectedNames,
         (feedback) => {
-          console.log("📡 Navigation feedback:", feedback);
           const currentName = (feedback as any)?.current_position_name as string | undefined;
 
-if (currentName) {
-  const idx = selectedNames.indexOf(currentName);
-  if (idx !== -1) {
-    setCurrentNavigatingIndex(idx);
-    toast.info(`At position ${idx + 1}/${selectedNames.length}: ${currentName}`);
-  } else {
-    // Name not in list (still show something)
-    toast.info(`Navigating: ${currentName}`);
-  }
-}
-
+          if (currentName) {
+            const idx = selectedNames.indexOf(currentName);
+            if (idx !== -1) {
+              setCurrentNavigatingIndex(idx);
+              toast.info(`At position ${idx + 1}/${selectedNames.length}: ${currentName}`);
+            } else {
+              toast.info(`Navigating: ${currentName}`);
+            }
+          }
         }
       );
-      
+
       if (result.success) {
         toast.success(
           `Completed! Reached ${result.positions_reached}/${selectedNames.length} positions`
@@ -161,7 +157,7 @@ if (currentName) {
         toast.error(`Navigation failed: ${result.message}`);
       }
     } catch (error) {
-      console.error("❌ Navigation error:", error);
+      console.error("Navigation error:", error);
       toast.error("Navigation error");
     } finally {
       setIsNavigating(false);
@@ -275,11 +271,11 @@ if (currentName) {
         )}
 
         {/* Position List */}
-        <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+        <div className="flex-1 overflow-y-auto space-y-2 pr-1 max-h-[50vh] lg:max-h-none">
           {positions.length === 0 ? (
-            <div className="text-center py-8 text-slate-400 text-xs">
+            <div className="text-center py-8 text-slate-400 text-sm">
               No saved positions
-              <p className="text-[10px] mt-1 text-slate-500">
+              <p className="text-xs mt-1 text-slate-500">
                 Drive to a location and save it
               </p>
             </div>
@@ -292,7 +288,7 @@ if (currentName) {
               return (
                 <div
                   key={pos.id}
-                  className={`flex items-center gap-2 p-2 rounded border transition-all group ${
+                  className={`flex items-center gap-2 p-3 rounded border transition-all group ${
                     isCurrentlyNavigating
                       ? "bg-blue-500/20 border-blue-400/50"
                       : isSelected
@@ -308,34 +304,34 @@ if (currentName) {
                   />
 
                   <div className="flex-1 min-w-0">
-                    <div className="text-xs font-medium text-slate-200 truncate">
+                    <div className="text-sm md:text-base font-medium text-slate-200 truncate">
                       {pos.name}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono">
+                    <div className="text-xs md:text-sm text-slate-400 font-mono">
                       x: {pos.x.toFixed(2)}, y: {pos.y.toFixed(2)}, θ:{" "}
                       {pos.theta.toFixed(2)}
                     </div>
                   </div>
 
-                  <div className="flex gap-1 opacity-0 group-hover:opacity-100 md:opacity-100 transition-opacity shrink-0">
+                  <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
                     <Button
                       size="sm"
                       onClick={() => handleNavigateToSingle(pos.name)}
                       disabled={!isConnected || disabled || isNavigating}
-                      className="h-7 w-7 p-0 bg-blue-600/80 hover:bg-blue-600 text-white"
+                      className="h-8 w-8 p-0 bg-blue-600/80 hover:bg-blue-600 text-white"
                       title="Navigate to this position"
                     >
-                      <Navigation className="w-3 h-3" />
+                      <Navigation className="w-4 h-4" />
                     </Button>
                     <Button
                       size="sm"
                       variant="ghost"
                       onClick={() => handleDeletePosition(pos.name)}
                       disabled={!isConnected || disabled || isNavigating}
-                      className="h-7 w-7 p-0 hover:bg-red-500/20 text-red-400"
+                      className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400"
                       title="Delete position"
                     >
-                      <Trash2 className="w-3 h-3" />
+                      <Trash2 className="w-4 h-4" />
                     </Button>
                   </div>
                 </div>

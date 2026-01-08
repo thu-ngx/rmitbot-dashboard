@@ -75,24 +75,16 @@ export function useRobot() {
   // x (forward), y (strafe), z (turn)
   const move = useCallback(
     (x: number, y: number, z: number) => {
-      console.log("🚀 Move called:", { x, y, z, mode: state.mode });
       if (state.mode === "autonomous") return;
 
       lastInputRef.current = { x, y, z };
       const multiplier = getSpeedMultiplier();
-      console.log(
-        "⚡ Speed multiplier:",
-        multiplier,
-        "mode:",
-        speedModeRef.current
-      );
 
       cmdVelRef.current = {
         x: x * multiplier,
         y: y * multiplier,
         z: z * multiplier,
       };
-      console.log("📊 Velocity to publish:", cmdVelRef.current);
 
       const currentSpeed = Math.sqrt(
         Math.pow(x * multiplier, 2) + Math.pow(y * multiplier, 2)
@@ -107,13 +99,7 @@ export function useRobot() {
   // 10Hz Control Loop
   useEffect(() => {
     if (!isConnected) return;
-    let publishCount = 0;
     const interval = setInterval(() => {
-      publishCount++;
-      if (publishCount % 10 === 0) {
-        // Log every 1 second (10 x 100ms)
-        console.log("📡 Publishing (10Hz):", cmdVelRef.current);
-      }
       rosService.publishVelocity(
         cmdVelRef.current.x,
         cmdVelRef.current.y,

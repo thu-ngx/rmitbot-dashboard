@@ -26,15 +26,13 @@ class PositionService {
   public cancelNavigation(): void {
     try {
       if (this.currentSingleGoal) {
-        console.log("🛑 Cancelling single navigation goal...");
         this.currentSingleGoal.cancel();
       }
       if (this.currentMultiGoal) {
-        console.log("🛑 Cancelling multi navigation goal...");
         this.currentMultiGoal.cancel();
       }
     } catch (e) {
-      console.warn("⚠️ Failed to cancel navigation:", e);
+      console.warn("Failed to cancel navigation:", e);
     } finally {
       this.currentSingleGoal = null;
       this.currentMultiGoal = null;
@@ -50,12 +48,10 @@ class PositionService {
       const ros = rosService.getROS();
 
       if (!rosService.isConnected) {
-        console.error("❌ Cannot save position: ROS not connected");
+        console.error("Cannot save position: ROS not connected");
         reject(new Error("ROS not connected"));
         return;
       }
-
-      console.log(`📍 Attempting to save position: "${name}"`);
 
       const savePositionService = new ROSLIB.Service({
         ros: ros,
@@ -64,13 +60,12 @@ class PositionService {
       });
 
       const request = { name };
-      console.log("📤 Sending save request:", request);
 
       // Add timeout for service call
       let responded = false;
       const timeout = setTimeout(() => {
         if (!responded) {
-          console.error("⏱️ Save position service timeout (no response in 10s)");
+          console.error("Save position service timeout");
           reject(new Error("Service call timeout - is the ROS2 node running?"));
         }
       }, 10000);
@@ -80,13 +75,6 @@ class PositionService {
         (response: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.log("✅ Save position response:", response);
-
-          if (response.success) {
-            console.log(`✅ Position "${name}" saved successfully`);
-          } else {
-            console.warn(`⚠️ Save failed: ${response.message}`);
-          }
 
           resolve({
             success: response.success,
@@ -96,7 +84,7 @@ class PositionService {
         (error: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.error("❌ Save position service error:", error);
+          console.error("Save position service error:", error);
           reject(error);
         }
       );
@@ -109,12 +97,10 @@ class PositionService {
       const ros = rosService.getROS();
 
       if (!rosService.isConnected) {
-        console.error("❌ Cannot get positions: ROS not connected");
+        console.error("Cannot get positions: ROS not connected");
         reject(new Error("ROS not connected"));
         return;
       }
-
-      console.log("📍 Fetching saved positions...");
 
       const getPositionsService = new ROSLIB.Service({
         ros: ros,
@@ -128,7 +114,7 @@ class PositionService {
       let responded = false;
       const timeout = setTimeout(() => {
         if (!responded) {
-          console.error("⏱️ Get positions service timeout (no response in 10s)");
+          console.error("Get positions service timeout");
           reject(new Error("Service call timeout - is the ROS2 node running?"));
         }
       }, 10000);
@@ -138,11 +124,10 @@ class PositionService {
         (response: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.log("✅ Get positions response:", response);
 
           // Validate response structure
           if (!response.names || !Array.isArray(response.names)) {
-            console.error("❌ Invalid response structure:", response);
+            console.error("Invalid response structure");
             reject(new Error("Invalid response from get_positions service"));
             return;
           }
@@ -157,13 +142,12 @@ class PositionService {
               timestamp: Date.now(),
             })
           );
-          console.log(`✅ Loaded ${positions.length} positions`);
           resolve(positions);
         },
         (error: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.error("❌ Get positions service error:", error);
+          console.error("Get positions service error:", error);
           reject(error);
         }
       );
@@ -191,11 +175,10 @@ class PositionService {
       deletePositionService.callService(
         request,
         (response: any) => {
-          console.log("✅ Position deleted:", response);
           resolve(response.success);
         },
         (error: any) => {
-          console.error("❌ Delete position failed:", error);
+          console.error("Delete position failed:", error);
           reject(error);
         }
       );
@@ -240,21 +223,19 @@ class PositionService {
         } catch {}
       };
 
-      // "server not responding" guard (replaces isServerReady)
+      // "server not responding" guard
       const serverResponseTimeout = setTimeout(() => {
         if (finished) return;
         if (!gotAnyResponse) {
-          console.warn("⚠️ No feedback/status from action server; cancelling goal");
           try { goal.cancel(); } catch {}
           cleanup();
           reject(new Error("Action server not responding (no feedback/status within 5s)"));
         }
       }, 5000);
 
-      // Overall navigation timeout (optional; keep yours)
+      // Overall navigation timeout
       const navigationTimeout = setTimeout(() => {
         if (finished) return;
-        console.warn("⚠️ Navigation timeout; cancelling...");
         try { goal.cancel(); } catch {}
         cleanup();
         reject(new Error("Navigation timeout after 6 minutes"));
@@ -340,7 +321,6 @@ async navigateThroughPositions(
     const serverResponseTimeout = setTimeout(() => {
       if (finished) return;
       if (!gotAnyResponse) {
-        console.warn("⚠️ No feedback/status from action server; cancelling goal");
         try { goal.cancel(); } catch {}
         cleanup();
         reject(new Error("Action server not responding (no feedback/status within 5s)"));
