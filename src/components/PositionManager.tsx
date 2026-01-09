@@ -36,6 +36,7 @@ export function PositionManager({
   const [newPositionName, setNewPositionName] = useState("");
   const [currentNavigatingIndex, setCurrentNavigatingIndex] =
     useState<number>(-1);
+  const [navigationStatus, setNavigationStatus] = useState<string>("");
 
   useEffect(() => {
     if (isConnected) {
@@ -100,22 +101,39 @@ export function PositionManager({
   };
 
   const handleNavigateToSingle = async (name: string) => {
+    if (isNavigating) {
+      toast.warning("Navigation already in progress");
+      return;
+    }
+
     setIsNavigating(true);
+    setNavigationStatus(`Starting navigation to ${name}...`);
+    
     try {
       toast.info(`Navigating to ${name}...`);
+      console.log(`[PositionManager] Starting navigation to: ${name}`);
 
-      const result = await positionService.navigateToPosition(name);
+      const result = await positionService.navigateToPosition(
+        name,
+        (status) => {
+          console.log(`[PositionManager] Feedback: ${status}`);
+          setNavigationStatus(status);
+        }
+      );
+
+      console.log(`[PositionManager] Navigation result:`, result);
 
       if (result.success) {
         toast.success(`Reached ${name}`);
       } else {
         toast.error(`Failed to reach ${name}: ${result.message}`);
       }
-    } catch (error) {
-      console.error("Navigation error:", error);
-      toast.error("Navigation error");
+    } catch (error: any) {
+      console.error("[PositionManager] Navigation error:", error);
+      toast.error(error?.message || "Navigation error");
     } finally {
       setIsNavigating(false);
+      setNavigationStatus("");
     }
   };
 
@@ -125,29 +143,41 @@ export function PositionManager({
       return;
     }
 
+    if (isNavigating) {
+      toast.warning("Navigation already in progress");
+      return;
+    }
+
     const selectedNames = Array.from(selectedPositions);
     setIsNavigating(true);
     setCurrentNavigatingIndex(0);
+    setNavigationStatus(`Starting navigation through ${selectedNames.length} positions...`);
 
     try {
       toast.info(`Navigating through ${selectedNames.length} positions...`);
+      console.log(`[PositionManager] Starting multi-navigation: ${selectedNames.join(', ')}`);
 
       const result = await positionService.navigateThroughPositions(
         selectedNames,
         (feedback) => {
+          console.log(`[PositionManager] Multi-feedback:`, feedback);
           const currentName = (feedback as any)?.current_position_name as string | undefined;
 
           if (currentName) {
             const idx = selectedNames.indexOf(currentName);
             if (idx !== -1) {
               setCurrentNavigatingIndex(idx);
+              setNavigationStatus(`At position ${idx + 1}/${selectedNames.length}: ${currentName}`);
               toast.info(`At position ${idx + 1}/${selectedNames.length}: ${currentName}`);
             } else {
+              setNavigationStatus(`Navigating: ${currentName}`);
               toast.info(`Navigating: ${currentName}`);
             }
           }
         }
       );
+
+      console.log(`[PositionManager] Multi-navigation result:`, result);
 
       if (result.success) {
         toast.success(
@@ -156,13 +186,23 @@ export function PositionManager({
       } else {
         toast.error(`Navigation failed: ${result.message}`);
       }
-    } catch (error) {
-      console.error("Navigation error:", error);
-      toast.error("Navigation error");
+    } catch (error: any) {
+      console.error("[PositionManager] Multi-navigation error:", error);
+      toast.error(error?.message || "Navigation error");
     } finally {
       setIsNavigating(false);
       setCurrentNavigatingIndex(-1);
+      setNavigationStatus("");
     }
+  };
+
+  const handleCancelNavigation = () => {
+    console.log("[PositionManager] Cancelling navigation...");
+    positionService.cancelNavigation();
+    setIsNavigating(false);
+    setCurrentNavigatingIndex(-1);
+    setNavigationStatus("");
+    toast.info("Navigation cancelled");
   };
 
   const toggleSelection = (name: string) => {
@@ -237,6 +277,13 @@ export function PositionManager({
           </Button>
         </div>
 
+        {/* Navigation Status */}
+        {isNavigating && navigationStatus && (
+          <div className="p-2 bg-blue-900/30 border border-blue-700/50 rounded text-xs text-blue-300">
+            🤖 {navigationStatus}
+          </div>
+        )}
+
         {/* Navigation Controls */}
         {selectedPositions.size > 0 && (
           <div className="flex gap-2">
@@ -254,13 +301,7 @@ export function PositionManager({
               <Button
                 size="sm"
                 variant="destructive"
-                onClick={() => {
-  positionService.cancelNavigation();  // <-- actually cancels ROS action goal
-  setIsNavigating(false);
-  setCurrentNavigatingIndex(-1);
-  toast.info("Navigation cancelled");
-}}
-
+                onClick={handleCancelNavigation}
                 className="flex-1 h-8 text-xs"
               >
                 <Square className="w-3 h-3 mr-1" />
