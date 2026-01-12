@@ -28,7 +28,7 @@ class RosService {
 
   private setupListeners() {
     this.ros.on("connection", () => {
-      console.log("✅ Connected to ROS");
+      console.log("Connected to ROS");
       this.isConnected = true;
       this.isIntentionalDisconnect = false;
 
@@ -39,7 +39,7 @@ class RosService {
     });
 
     this.ros.on("close", () => {
-      console.log("❌ Disconnected from ROS");
+      console.log("Disconnected from ROS");
       this.isConnected = false;
       this.cmdVelPublisher = null;
       this.odomSubscriber = null;
@@ -50,7 +50,7 @@ class RosService {
     });
 
     this.ros.on("error", (error) => {
-      console.error("⚠️ ROS Error:", error);
+      console.error("ROS Error:", error);
     });
   }
 
@@ -65,7 +65,7 @@ class RosService {
   private initSubscribers() {
     this.odomSubscriber = new ROSLIB.Topic({
       ros: this.ros,
-      name: "/odom",
+      name: "/odom_ekf",
       messageType: "nav_msgs/Odometry",
     });
 
@@ -76,7 +76,7 @@ class RosService {
         }
       });
     } catch (error) {
-      console.error("❌ Subscriber init failed:", error);
+      console.error("Subscriber init failed:", error);
     }
   }
 
@@ -89,7 +89,10 @@ class RosService {
     linear_y: number,
     angular_z: number
   ) {
-    if (!this.isConnected || !this.cmdVelPublisher) return;
+    if (!this.isConnected || !this.cmdVelPublisher) {
+      console.warn("Cannot publish velocity - not connected or publisher not initialized");
+      return;
+    }
 
     const twistStamped: TwistStampedMessage = {
       header: {
@@ -104,8 +107,9 @@ class RosService {
 
     try {
       this.cmdVelPublisher.publish(twistStamped);
+      console.log(`Published velocity - linear: [${linear_x.toFixed(2)}, ${linear_y.toFixed(2)}, 0], angular: [0, 0, ${angular_z.toFixed(2)}]`);
     } catch (error) {
-      console.error("❌ Publish failed:", error);
+      console.error("Publish failed:", error);
     }
   }
 

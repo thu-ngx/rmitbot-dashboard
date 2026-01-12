@@ -54,7 +54,7 @@ export function StatusDisplay({ isConnected }: StatusDisplayProps) {
           setSpeed(speed);
         }
       } catch (error) {
-        console.error("❌ Error processing odometry:", error);
+        console.error("Error processing odometry:", error);
       }
     });
   }, [isConnected]);

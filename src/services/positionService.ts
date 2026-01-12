@@ -3,14 +3,26 @@ import { rosService } from "./ros2Connection";
 import type {
   SavedPosition,
   RobotPose,
+  NavigateToPositionGoal,
+  NavigateToPositionFeedback,
+  NavigateToPositionResult,
+  NavigateThroughPositionsGoal,
   NavigateThroughPositionsFeedback,
   NavigateThroughPositionsResult,
 } from "@/types";
 
 class PositionService {
   private static instance: PositionService;
-  private currentSingleGoal: ROSLIB.Goal | null = null;
-  private currentMultiGoal: ROSLIB.Goal | null = null;
+  private currentSingleGoal: ROSLIB.Goal<
+    NavigateToPositionGoal,
+    NavigateToPositionFeedback,
+    NavigateToPositionResult
+  > | null = null;
+  private currentMultiGoal: ROSLIB.Goal<
+    NavigateThroughPositionsGoal,
+    NavigateThroughPositionsFeedback,
+    NavigateThroughPositionsResult
+  > | null = null;
 
   private constructor() {}
 
@@ -22,18 +34,18 @@ class PositionService {
   }
 
   public cancelNavigation(): void {
-    console.log("[PositionService] Cancelling navigation...");
+    console.log("Cancelling navigation...");
     try {
       if (this.currentSingleGoal) {
-        console.log("[PositionService] Cancelling single goal");
+        console.log("Cancelling single goal");
         this.currentSingleGoal.cancel();
       }
       if (this.currentMultiGoal) {
-        console.log("[PositionService] Cancelling multi goal");
+        console.log("Cancelling multi goal");
         this.currentMultiGoal.cancel();
       }
     } catch (e) {
-      console.warn("[PositionService] Failed to cancel navigation:", e);
+      console.warn("Failed to cancel navigation:", e);
     } finally {
       this.currentSingleGoal = null;
       this.currentMultiGoal = null;
@@ -48,14 +60,12 @@ class PositionService {
       const ros = rosService.getROS();
 
       if (!rosService.isConnected) {
-        console.error(
-          "[PositionService] Cannot save position: ROS not connected"
-        );
+        console.error("Cannot save position: ROS not connected");
         reject(new Error("ROS not connected"));
         return;
       }
 
-      console.log(`[PositionService] Saving position: ${name}`);
+      console.log(`Saving position: ${name}`);
 
       const savePositionService = new ROSLIB.Service({
         ros: ros,
@@ -69,7 +79,7 @@ class PositionService {
       let responded = false;
       const timeout = setTimeout(() => {
         if (!responded) {
-          console.error("[PositionService] Save position service timeout");
+          console.error("Save position service timeout");
           reject(new Error("Service call timeout - is the ROS2 node running?"));
         }
       }, 10000);
@@ -79,7 +89,7 @@ class PositionService {
         (response: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.log("[PositionService] Save response:", response);
+          console.log("Save response:", response);
 
           resolve({
             success: response.success,
@@ -89,10 +99,7 @@ class PositionService {
         (error: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.error(
-            "[PositionService] Save position service error:",
-            error
-          );
+          console.error("Save position service error:", error);
           reject(error);
         }
       );
@@ -105,14 +112,12 @@ class PositionService {
       const ros = rosService.getROS();
 
       if (!rosService.isConnected) {
-        console.error(
-          "[PositionService] Cannot get positions: ROS not connected"
-        );
+        console.error("Cannot get positions: ROS not connected");
         reject(new Error("ROS not connected"));
         return;
       }
 
-      console.log("[PositionService] Getting positions...");
+      console.log("Getting positions...");
 
       const getPositionsService = new ROSLIB.Service({
         ros: ros,
@@ -126,7 +131,7 @@ class PositionService {
       let responded = false;
       const timeout = setTimeout(() => {
         if (!responded) {
-          console.error("[PositionService] Get positions service timeout");
+          console.error("Get positions service timeout");
           reject(new Error("Service call timeout - is the ROS2 node running?"));
         }
       }, 10000);
@@ -136,11 +141,11 @@ class PositionService {
         (response: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.log("[PositionService] Get positions response:", response);
+          console.log("Get positions response:", response);
 
           // Validate response structure
           if (!response.names || !Array.isArray(response.names)) {
-            console.error("[PositionService] Invalid response structure");
+            console.error("Invalid response structure");
             reject(new Error("Invalid response from get_positions service"));
             return;
           }
@@ -160,10 +165,7 @@ class PositionService {
         (error: any) => {
           responded = true;
           clearTimeout(timeout);
-          console.error(
-            "[PositionService] Get positions service error:",
-            error
-          );
+          console.error("Get positions service error:", error);
           reject(error);
         }
       );
@@ -180,7 +182,7 @@ class PositionService {
         return;
       }
 
-      console.log(`[PositionService] Deleting position: ${name}`);
+      console.log(`Deleting position: ${name}`);
 
       const deletePositionService = new ROSLIB.Service({
         ros: ros,
@@ -193,18 +195,18 @@ class PositionService {
       deletePositionService.callService(
         request,
         (response: any) => {
-          console.log("[PositionService] Delete response:", response);
+          console.log("Delete response:", response);
           resolve(response.success);
         },
         (error: any) => {
-          console.error("[PositionService] Delete position failed:", error);
+          console.error("Delete position failed:", error);
           reject(error);
         }
       );
     });
   }
 
-  // Navigate to single position (ACTION) - FIXED VERSION
+  // Navigate to single position (ACTION)
   async navigateToPosition(
     name: string,
     onFeedback?: (status: string) => void
@@ -217,11 +219,13 @@ class PositionService {
         return;
       }
 
-      console.log(
-        `[PositionService] ====== Starting navigation to: ${name} ======`
-      );
+      console.log(`====== Starting navigation to: ${name} ======`);
 
-      const actionClient = new ROSLIB.ActionClient({
+      const actionClient = new ROSLIB.ActionClient<
+        NavigateToPositionGoal,
+        NavigateToPositionFeedback,
+        NavigateToPositionResult
+      >({
         ros,
         serverName: "/navigate_to_position",
         actionName: "position_manager_msgs/action/NavigateToPosition",
@@ -230,7 +234,11 @@ class PositionService {
       let finished = false;
       let goalAccepted = false;
 
-      const goal = new ROSLIB.Goal({
+      const goal = new ROSLIB.Goal<
+        NavigateToPositionGoal,
+        NavigateToPositionFeedback,
+        NavigateToPositionResult
+      >({
         actionClient,
         goalMessage: { position_name: name },
       });
@@ -242,17 +250,19 @@ class PositionService {
         if (finished) return;
         finished = true;
         this.currentSingleGoal = null;
-        console.log("[PositionService] Cleanup completed");
+        console.log("Cleanup completed");
       };
 
       // Timeout for initial goal acceptance (longer timeout - 15s)
       const acceptanceTimeout = setTimeout(() => {
         if (finished) return;
         if (!goalAccepted) {
-          console.error("[PositionService] Goal not accepted within 15s");
+          console.error("Goal not accepted within 15s");
           try {
             goal.cancel();
-          } catch {}
+          } catch (error) {
+            console.warn("Failed to cancel goal during timeout:", error);
+          }
           cleanup();
           reject(
             new Error(
@@ -265,19 +275,18 @@ class PositionService {
       // Overall navigation timeout (6 minutes)
       const navigationTimeout = setTimeout(() => {
         if (finished) return;
-        console.error("[PositionService] Navigation timeout after 6 minutes");
+        console.error("Navigation timeout after 6 minutes");
         try {
           goal.cancel();
-        } catch {}
+        } catch (error) {
+          console.warn("Failed to cancel goal during navigation timeout:", error);
+        }
         cleanup();
         reject(new Error("Navigation timeout after 6 minutes"));
       }, 360000);
 
       goal.on("feedback", (feedback: any) => {
-        console.log(
-          "[PositionService] Feedback received:",
-          JSON.stringify(feedback)
-        );
+        console.log("Feedback received:", JSON.stringify(feedback));
         goalAccepted = true; // If we get feedback, goal was accepted
         clearTimeout(acceptanceTimeout);
         if (onFeedback) {
@@ -287,10 +296,7 @@ class PositionService {
       });
 
       goal.on("status", (status: any) => {
-        console.log(
-          "[PositionService] Status received:",
-          JSON.stringify(status)
-        );
+        console.log("Status received:", JSON.stringify(status));
         // roslib sends status updates - check for acceptance
         // Status codes: 1=PENDING, 2=ACTIVE, 3=PREEMPTED, 4=SUCCEEDED, 5=ABORTED, etc.
         const statusCode = status?.status;
@@ -301,7 +307,7 @@ class PositionService {
           statusCode === "PENDING"
         ) {
           if (!goalAccepted) {
-            console.log("[PositionService] Goal accepted!");
+            console.log("Goal accepted!");
             goalAccepted = true;
             clearTimeout(acceptanceTimeout);
           }
@@ -309,15 +315,12 @@ class PositionService {
       });
 
       goal.on("result", (result: any) => {
-        console.log(
-          "[PositionService] Result received:",
-          JSON.stringify(result)
-        );
+        console.log("Result received:", JSON.stringify(result));
         clearTimeout(acceptanceTimeout);
         clearTimeout(navigationTimeout);
 
         if (finished) {
-          console.log("[PositionService] Already finished, ignoring result");
+          console.log("Already finished, ignoring result");
           return;
         }
 
@@ -330,47 +333,40 @@ class PositionService {
           actualResult = result.values;
         }
 
-        console.log(
-          "[PositionService] Actual result:",
-          JSON.stringify(actualResult)
-        );
+        console.log("Actual result:", JSON.stringify(actualResult));
 
         const success = actualResult?.success === true;
         const message =
           actualResult?.message ||
           (success ? `Arrived at ${name}` : "Navigation failed");
 
-        console.log(
-          `[PositionService] Navigation ${
-            success ? "SUCCEEDED" : "FAILED"
-          }: ${message}`
-        );
+        console.log(`Navigation ${success ? "SUCCEEDED" : "FAILED"}: ${message}`);
         cleanup();
         resolve({ success, message });
       });
 
       goal.on("timeout", () => {
-        console.error("[PositionService] Goal timeout event fired");
+        console.error("Goal timeout event fired");
         clearTimeout(acceptanceTimeout);
         clearTimeout(navigationTimeout);
         cleanup();
         reject(new Error("Navigation goal timed out"));
       });
 
-      // Listen for any errors
-      actionClient.on("error", (error: any) => {
-        console.error("[PositionService] ActionClient error:", error);
-      });
+      // // Listen for any errors
+      // actionClient.on("error", (error: any) => {
+      //   console.error("ActionClient error:", error);
+      // });
 
       // Send the goal
-      console.log("[PositionService] Sending goal...");
+      console.log("Sending goal...");
       goal.send();
-      console.log("[PositionService] Goal sent!");
+      console.log("Goal sent!");
       if (onFeedback) onFeedback("Goal sent to robot...");
     });
   }
 
-  // Navigate through multiple positions (ACTION) - FIXED VERSION
+  // Navigate through multiple positions (ACTION) 
   async navigateThroughPositions(
     names: string[],
     onFeedback?: (feedback: NavigateThroughPositionsFeedback) => void
@@ -383,13 +379,13 @@ class PositionService {
         return;
       }
 
-      console.log(
-        `[PositionService] ====== Starting multi-navigation: ${names.join(
-          ", "
-        )} ======`
-      );
+      console.log(`====== Starting multi-navigation: ${names.join(", ")} ======`);
 
-      const actionClient = new ROSLIB.ActionClient({
+      const actionClient = new ROSLIB.ActionClient<
+        NavigateThroughPositionsGoal,
+        NavigateThroughPositionsFeedback,
+        NavigateThroughPositionsResult
+      >({
         ros,
         serverName: "/navigate_positions",
         actionName: "position_manager_msgs/action/NavigatePositions",
@@ -398,7 +394,11 @@ class PositionService {
       let finished = false;
       let goalAccepted = false;
 
-      const goal = new ROSLIB.Goal({
+      const goal = new ROSLIB.Goal<
+        NavigateThroughPositionsGoal,
+        NavigateThroughPositionsFeedback,
+        NavigateThroughPositionsResult
+      >({
         actionClient,
         goalMessage: { position_names: names },
       });
@@ -410,17 +410,19 @@ class PositionService {
         if (finished) return;
         finished = true;
         this.currentMultiGoal = null;
-        console.log("[PositionService] Multi-navigation cleanup completed");
+        console.log("Multi-navigation cleanup completed");
       };
 
       // Timeout for initial goal acceptance (15s)
       const acceptanceTimeout = setTimeout(() => {
         if (finished) return;
         if (!goalAccepted) {
-          console.error("[PositionService] Multi-goal not accepted within 15s");
+          console.error("Multi-goal not accepted within 15s");
           try {
             goal.cancel();
-          } catch {}
+          } catch (error) {
+            console.warn("Failed to cancel multi-goal during timeout:", error);
+          }
           cleanup();
           reject(
             new Error(
@@ -431,10 +433,7 @@ class PositionService {
       }, 15000);
 
       goal.on("feedback", (feedback: any) => {
-        console.log(
-          "[PositionService] Multi-feedback received:",
-          JSON.stringify(feedback)
-        );
+        console.log("Multi-feedback received:", JSON.stringify(feedback));
         goalAccepted = true;
         clearTimeout(acceptanceTimeout);
         if (onFeedback) {
@@ -445,10 +444,7 @@ class PositionService {
       });
 
       goal.on("status", (status: any) => {
-        console.log(
-          "[PositionService] Multi-status received:",
-          JSON.stringify(status)
-        );
+        console.log("Multi-status received:", JSON.stringify(status));
         const statusCode = status?.status;
         if (
           statusCode === 1 ||
@@ -457,7 +453,7 @@ class PositionService {
           statusCode === "PENDING"
         ) {
           if (!goalAccepted) {
-            console.log("[PositionService] Multi-goal accepted!");
+            console.log("Multi-goal accepted!");
             goalAccepted = true;
             clearTimeout(acceptanceTimeout);
           }
@@ -465,16 +461,11 @@ class PositionService {
       });
 
       goal.on("result", (result: any) => {
-        console.log(
-          "[PositionService] Multi-result received:",
-          JSON.stringify(result)
-        );
+        console.log("Multi-result received:", JSON.stringify(result));
         clearTimeout(acceptanceTimeout);
 
         if (finished) {
-          console.log(
-            "[PositionService] Already finished, ignoring multi-result"
-          );
+          console.log("Already finished, ignoring multi-result");
           return;
         }
 
@@ -486,10 +477,7 @@ class PositionService {
           actualResult = result.values;
         }
 
-        console.log(
-          "[PositionService] Actual multi-result:",
-          JSON.stringify(actualResult)
-        );
+        console.log("Actual multi-result:", JSON.stringify(actualResult));
 
         cleanup();
         resolve({
@@ -500,20 +488,20 @@ class PositionService {
       });
 
       goal.on("timeout", () => {
-        console.error("[PositionService] Multi-goal timeout event");
+        console.error("Multi-goal timeout event");
         clearTimeout(acceptanceTimeout);
         cleanup();
         reject(new Error("Multi-navigation goal timed out"));
       });
 
       // Send immediately
-      console.log("[PositionService] Sending multi-goal...");
+      console.log("Sending multi-goal...");
       goal.send();
-      console.log("[PositionService] Multi-goal sent!");
+      console.log("Multi-goal sent!");
     });
   }
 
-  // Get current robot pose from /odom
+  // Get current robot pose from /odom_ekf
   async getCurrentPose(): Promise<RobotPose> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
@@ -525,7 +513,7 @@ class PositionService {
 
       const odomListener = new ROSLIB.Topic({
         ros: ros,
-        name: "/odom",
+        name: "/odom_ekf",
         messageType: "nav_msgs/Odometry",
       });
 

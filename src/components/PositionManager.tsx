@@ -95,7 +95,7 @@ export function PositionManager({
         toast.error("Failed to delete position");
       }
     } catch (error) {
-      console.error("❌ Error deleting position:", error);
+      console.error("Error deleting position:", error);
       toast.error("Error deleting position");
     }
   };
@@ -280,7 +280,7 @@ export function PositionManager({
         {/* Navigation Status */}
         {isNavigating && navigationStatus && (
           <div className="p-2 bg-blue-900/30 border border-blue-700/50 rounded text-xs text-blue-300">
-            🤖 {navigationStatus}
+            {navigationStatus}
           </div>
         )}
 

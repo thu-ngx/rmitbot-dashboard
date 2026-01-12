@@ -3,6 +3,7 @@ const ROBOT_IP = "100.122.233.111"; // RPI
 // const ROBOT_IP = "100.68.218.48"; // Ubuntu lesson 6
 // const ROBOT_IP = "100.114.20.41"; // Triet
 // const ROBOT_IP = "100.75.217.119"; // Hoa
+// const ROBOT_IP = "100.91.20.95" // Loc
 
 export const ROS_CONFIG = {
   IP: ROBOT_IP,
