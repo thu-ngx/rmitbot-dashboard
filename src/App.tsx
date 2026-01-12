@@ -107,7 +107,7 @@ export default function App() {
               variant="outline"
               className="text-[10px] md:text-xs text-slate-300 border-slate-600 hidden sm:inline-flex"
             >
-              {ROS_CONFIG.TARGET.toUpperCase()} ({ROS_CONFIG.IP})
+              {ROS_CONFIG.IP}
             </Badge>
           </div>
 
