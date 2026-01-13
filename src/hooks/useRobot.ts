@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { toast } from "sonner";
-import type { RobotState, OperationMode, SpeedMode, NavigationStatus } from "../types";
+import type { RobotState, SpeedMode, NavigationStatus } from "../types";
 import { useRos } from "./useRos";
 import { rosService } from "../services/ros2Connection";
 import { ROS_CONFIG } from "../config";
@@ -11,7 +10,6 @@ export function useRobot() {
   const [state, setState] = useState<Omit<RobotState, "isConnected">>({
     batteryLevel: 78,
     speed: 0,
-    mode: "manual",
     navigationStatus: "idle",
     currentPose: { x: 0, y: 0, theta: 0 },
   });
@@ -55,12 +53,6 @@ export function useRobot() {
 
   const toggleConnection = () => (isConnected ? disconnect() : connect());
 
-  const setMode = (mode: OperationMode) => {
-    if (!isConnected) return toast.error("Robot not connected");
-    setState((prev) => ({ ...prev, mode }));
-    stopPublishing();
-  };
-
   const setNavigationStatus = (navigationStatus: NavigationStatus) =>
     setState((prev) => ({ ...prev, navigationStatus }));
 
@@ -74,8 +66,8 @@ export function useRobot() {
   // x (forward), y (strafe), z (turn)
   const move = useCallback(
     (x: number, y: number, z: number) => {
-      if (state.mode === "autonomous" || !isConnected) {
-        console.warn("Cannot move - mode:", state.mode, "connected:", isConnected);
+      if (!isConnected) {
+        console.warn("Cannot move - connected:", isConnected);
         // Stop publishing if disconnected
         if (!isConnected && publishIntervalRef.current) {
           clearInterval(publishIntervalRef.current);
@@ -125,7 +117,7 @@ export function useRobot() {
         rosService.publishVelocity(vel_x, vel_y, vel_z);
       }
     },
-    [state.mode, isConnected, stopPublishing]
+    [isConnected, stopPublishing]
   );
 
   // --- LOOPS ---
@@ -161,7 +153,6 @@ export function useRobot() {
     isConnected,
     status,
     toggleConnection,
-    setMode,
     setNavigationStatus,
     move,
     setSpeedMode,

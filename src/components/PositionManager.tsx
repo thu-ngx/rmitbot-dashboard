@@ -16,13 +16,9 @@ import { usePosition } from "@/hooks/usePosition";
 
 interface PositionManagerProps {
   isConnected: boolean;
-  disabled?: boolean;
 }
 
-export function PositionManager({
-  isConnected,
-  disabled = false,
-}: PositionManagerProps) {
+export function PositionManager({ isConnected }: PositionManagerProps) {
   const {
     positions,
     selectedPositions,
@@ -81,7 +77,7 @@ export function PositionManager({
             placeholder="Position name..."
             value={newPositionName}
             onChange={(e) => setNewPositionName(e.target.value)}
-            disabled={!isConnected || disabled || isSaving}
+            disabled={!isConnected || isSaving}
             className="h-8 text-xs bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
             onKeyPress={(e) => e.key === "Enter" && handleSavePosition()}
           />
@@ -89,7 +85,7 @@ export function PositionManager({
             size="sm"
             onClick={handleSavePosition}
             disabled={
-              !isConnected || disabled || isSaving || !newPositionName.trim()
+              !isConnected || isSaving || !newPositionName.trim()
             }
             className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white border-0 whitespace-nowrap"
           >
@@ -118,7 +114,7 @@ export function PositionManager({
               <Button
                 size="sm"
                 onClick={handleNavigateSelected}
-                disabled={!isConnected || disabled}
+                disabled={!isConnected}
                 className="flex-1 h-8 bg-blue-600 hover:bg-blue-700 text-white border-0 text-xs"
               >
                 <Play className="w-3 h-3 mr-1" />
@@ -167,7 +163,7 @@ export function PositionManager({
                   <Checkbox
                     checked={isSelected}
                     onCheckedChange={() => toggleSelection(pos.name)}
-                    disabled={!isConnected || disabled || isNavigating}
+                    disabled={!isConnected || isNavigating}
                     className="h-4 w-4 border-slate-500 shrink-0"
                   />
 
@@ -185,7 +181,7 @@ export function PositionManager({
                     <Button
                       size="sm"
                       onClick={() => handleNavigateToSingle(pos.name)}
-                      disabled={!isConnected || disabled || isNavigating}
+                      disabled={!isConnected || isNavigating}
                       className="h-8 w-8 p-0 bg-blue-600/80 hover:bg-blue-600 text-white"
                       title="Navigate to this position"
                     >
@@ -195,7 +191,7 @@ export function PositionManager({
                       size="sm"
                       variant="ghost"
                       onClick={() => handleDeletePosition(pos.name)}
-                      disabled={!isConnected || disabled || isNavigating}
+                      disabled={!isConnected || isNavigating}
                       className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400"
                       title="Delete position"
                     >

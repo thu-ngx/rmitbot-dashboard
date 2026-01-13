@@ -1,4 +1,3 @@
-export type OperationMode = "manual" | "autonomous";
 export type SpeedMode = "eco" | "normal" | "fast";
 export type NavigationStatus = "idle" | "navigating" | "completed" | "failed";
 
@@ -21,7 +20,6 @@ export interface RobotState {
   batteryLevel: number;
   speed: number;
   currentPose: RobotPose;
-  mode: OperationMode;
   navigationStatus: NavigationStatus;
 }
 

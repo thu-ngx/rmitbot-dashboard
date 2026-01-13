@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Toaster, toast } from "sonner";
-import { Settings, Wifi, Hand, Navigation2 } from "lucide-react";
+import { Wifi } from "lucide-react";
 
 import { ControlButtons } from "./components/ControlButtons";
 import { SpeedControl } from "./components/SpeedControl";
@@ -8,7 +8,6 @@ import { PositionManager } from "./components/PositionManager";
 import { StatusDisplay } from "./components/StatusDisplay";
 import { Card } from "./components/ui/card";
 import { Switch } from "./components/ui/switch";
-import { Button } from "./components/ui/button";
 import { Badge } from "./components/ui/badge";
 
 import { useRobot } from "./hooks/useRobot";
@@ -26,8 +25,6 @@ export default function App() {
 
   const handleCommand = (cmd: string) => {
     if (!robot.isConnected) return toast.error("Robot Offline");
-    if (robot.mode === "autonomous")
-      return toast.error("Switch to Manual Mode");
 
     switch (cmd) {
       case "forward":
@@ -131,10 +128,7 @@ export default function App() {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[calc(100vh-120px)]">
           {/* Left Column: Position Manager - Full width on mobile, 8 cols on desktop */}
           <div className="lg:col-span-8">
-            <PositionManager
-              isConnected={robot.isConnected}
-              disabled={robot.mode === "autonomous"}
-            />
+            <PositionManager isConnected={robot.isConnected} />
           </div>
 
           {/* Right Column: Status + Control - Full width on mobile, 4 cols on desktop */}
@@ -144,42 +138,6 @@ export default function App() {
 
             {/* Control Card */}
             <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
-              {/* Mode Toggle */}
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex items-center gap-2">
-                  <Settings className="w-4 h-4 text-slate-400" />
-                  <span className="text-sm font-medium text-slate-300">Mode</span>
-                </div>
-                <div className="flex items-center gap-2 bg-slate-800/50 rounded-lg p-1">
-                  <Button
-                    size="sm"
-                    variant={robot.mode === "manual" ? "default" : "ghost"}
-                    onClick={() => robot.setMode("manual")}
-                    className={`h-8 px-3 ${
-                      robot.mode === "manual"
-                        ? "bg-purple-600 hover:bg-purple-700 text-white"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
-                    }`}
-                  >
-                    <Hand className="w-3 h-3 mr-1.5" />
-                    Manual
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={robot.mode === "autonomous" ? "default" : "ghost"}
-                    onClick={() => robot.setMode("autonomous")}
-                    className={`h-8 px-3 ${
-                      robot.mode === "autonomous"
-                        ? "bg-blue-600 hover:bg-blue-700 text-white"
-                        : "text-slate-400 hover:text-slate-200 hover:bg-slate-700/50"
-                    }`}
-                  >
-                    <Navigation2 className="w-3 h-3 mr-1.5" />
-                    Auto
-                  </Button>
-                </div>
-              </div>
-
               {/* Speed Control */}
               <h2 className="text-sm font-semibold mb-3 text-white">
                 Speed Control
@@ -187,7 +145,7 @@ export default function App() {
               <SpeedControl
                 selectedMode={speedMode}
                 onModeChange={handleSpeedChange}
-                disabled={robot.mode === "autonomous"}
+                disabled={false}
               />
 
               <div className="mt-4">
@@ -196,7 +154,7 @@ export default function App() {
                 </h2>
                 <ControlButtons
                   onCommand={handleCommand}
-                  disabled={!robot.isConnected || robot.mode === "autonomous"}
+                  disabled={!robot.isConnected}
                 />
               </div>
             </Card>
