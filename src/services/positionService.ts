@@ -206,9 +206,64 @@ class PositionService {
     });
   }
 
-  // Navigate to single position (ACTION)
+  // Navigate to single position (call Service Wrapper)
   async navigateToPosition(
     name: string,
+    onFeedback?: (status: string) => void
+  ): Promise<{ success: boolean; message: string }> {
+    return new Promise((resolve, reject) => {
+      const ros = rosService.getROS();
+      if (!rosService.isConnected) return reject(new Error("ROS not connected"));
+
+      // 1. Setup Feedback Listener
+      const feedbackTopic = new ROSLIB.Topic({
+        ros: ros,
+        name: "/navigation_web_status",
+        messageType: "std_msgs/String"
+      });
+
+      const feedbackHandler = (msg: any) => {
+        if (onFeedback) onFeedback(msg.data);
+      };
+      feedbackTopic.subscribe(feedbackHandler);
+
+      // 2. Call the Service to Start
+      // Use the 'SavePosition' service type structure for convenience
+      // Request: { name: string }
+      // Response: { success: boolean, message: string }
+      const navService = new ROSLIB.Service({
+        ros: ros,
+        name: "/start_navigation_web",
+        serviceType: "position_manager_msgs/srv/SavePosition"
+      });
+
+      const request = { name: name };
+
+      navService.callService(
+        request,
+        (response: any) => {
+          if (response.success) {
+            console.log("Navigation started successfully");
+            // Resolve immediately because it's async. 
+            // UI will update via the feedback callback.
+            resolve({ success: true, message: "Navigation started" });
+          } else {
+            // Clean up if it failed to start
+            feedbackTopic.unsubscribe(feedbackHandler);
+            resolve({ success: false, message: response.message });
+          }
+        },
+        (error: any) => {
+          feedbackTopic.unsubscribe(feedbackHandler);
+          reject(error);
+        }
+      );
+    });
+  }
+
+  // Navigate through multiple positions (call Service Wrapper)
+  async navigateThroughPositions(
+    names: string[],
     onFeedback?: (status: string) => void
   ): Promise<{ success: boolean; message: string }> {
     return new Promise((resolve, reject) => {
@@ -219,285 +274,64 @@ class PositionService {
         return;
       }
 
-      console.log(`====== Starting navigation to: ${name} ======`);
-
-      const actionClient = new ROSLIB.ActionClient<
-        NavigateToPositionGoal,
-        NavigateToPositionFeedback,
-        NavigateToPositionResult
-      >({
-        ros,
-        serverName: "/navigate_to_position",
-        actionName: "position_manager_msgs/action/NavigateToPosition",
-      });
-
-      let finished = false;
-      let goalAccepted = false;
-
-      const goal = new ROSLIB.Goal<
-        NavigateToPositionGoal,
-        NavigateToPositionFeedback,
-        NavigateToPositionResult
-      >({
-        actionClient,
-        goalMessage: { position_name: name },
-      });
-
-      // Store for Stop/cancel
-      this.currentSingleGoal = goal;
-
-      const cleanup = () => {
-        if (finished) return;
-        finished = true;
-        this.currentSingleGoal = null;
-        console.log("Cleanup completed");
-      };
-
-      // Timeout for initial goal acceptance (longer timeout - 15s)
-      const acceptanceTimeout = setTimeout(() => {
-        if (finished) return;
-        if (!goalAccepted) {
-          console.error("Goal not accepted within 15s");
-          try {
-            goal.cancel();
-          } catch (error) {
-            console.warn("Failed to cancel goal during timeout:", error);
-          }
-          cleanup();
-          reject(
-            new Error(
-              "Action server not responding - goal not accepted within 15s"
-            )
-          );
-        }
-      }, 15000);
-
-      // Overall navigation timeout (6 minutes)
-      const navigationTimeout = setTimeout(() => {
-        if (finished) return;
-        console.error("Navigation timeout after 6 minutes");
-        try {
-          goal.cancel();
-        } catch (error) {
-          console.warn("Failed to cancel goal during navigation timeout:", error);
-        }
-        cleanup();
-        reject(new Error("Navigation timeout after 6 minutes"));
-      }, 360000);
-
-      goal.on("feedback", (feedback: any) => {
-        console.log("Feedback received:", JSON.stringify(feedback));
-        goalAccepted = true; // If we get feedback, goal was accepted
-        clearTimeout(acceptanceTimeout);
-        if (onFeedback) {
-          const status = feedback?.status || `Navigating to ${name}...`;
-          onFeedback(status);
-        }
-      });
-
-      goal.on("status", (status: any) => {
-        console.log("Status received:", JSON.stringify(status));
-        // roslib sends status updates - check for acceptance
-        // Status codes: 1=PENDING, 2=ACTIVE, 3=PREEMPTED, 4=SUCCEEDED, 5=ABORTED, etc.
-        const statusCode = status?.status;
-        if (
-          statusCode === 1 ||
-          statusCode === 2 ||
-          statusCode === "ACTIVE" ||
-          statusCode === "PENDING"
-        ) {
-          if (!goalAccepted) {
-            console.log("Goal accepted!");
-            goalAccepted = true;
-            clearTimeout(acceptanceTimeout);
-          }
-        }
-      });
-
-      goal.on("result", (result: any) => {
-        console.log("Result received:", JSON.stringify(result));
-        clearTimeout(acceptanceTimeout);
-        clearTimeout(navigationTimeout);
-
-        if (finished) {
-          console.log("Already finished, ignoring result");
-          return;
-        }
-
-        // Handle different result structures from roslib
-        // For ROS2 actions via rosbridge, result might be nested under 'result' or 'values'
-        let actualResult = result;
-        if (result?.result !== undefined) {
-          actualResult = result.result;
-        } else if (result?.values !== undefined) {
-          actualResult = result.values;
-        }
-
-        console.log("Actual result:", JSON.stringify(actualResult));
-
-        const success = actualResult?.success === true;
-        const message =
-          actualResult?.message ||
-          (success ? `Arrived at ${name}` : "Navigation failed");
-
-        console.log(`Navigation ${success ? "SUCCEEDED" : "FAILED"}: ${message}`);
-        cleanup();
-        resolve({ success, message });
-      });
-
-      goal.on("timeout", () => {
-        console.error("Goal timeout event fired");
-        clearTimeout(acceptanceTimeout);
-        clearTimeout(navigationTimeout);
-        cleanup();
-        reject(new Error("Navigation goal timed out"));
-      });
-
-      // // Listen for any errors
-      // actionClient.on("error", (error: any) => {
-      //   console.error("ActionClient error:", error);
-      // });
-
-      // Send the goal
-      console.log("Sending goal...");
-      goal.send();
-      console.log("Goal sent!");
-      if (onFeedback) onFeedback("Goal sent to robot...");
-    });
-  }
-
-  // Navigate through multiple positions (ACTION) 
-  async navigateThroughPositions(
-    names: string[],
-    onFeedback?: (feedback: NavigateThroughPositionsFeedback) => void
-  ): Promise<NavigateThroughPositionsResult> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
-
-      if (!rosService.isConnected) {
-        reject(new Error("ROS not connected"));
-        return;
-      }
-
       console.log(`====== Starting multi-navigation: ${names.join(", ")} ======`);
 
-      const actionClient = new ROSLIB.ActionClient<
-        NavigateThroughPositionsGoal,
-        NavigateThroughPositionsFeedback,
-        NavigateThroughPositionsResult
-      >({
-        ros,
-        serverName: "/navigate_positions",
-        actionName: "position_manager_msgs/action/NavigatePositions",
+      // 1. Setup Feedback Listener
+      const feedbackTopic = new ROSLIB.Topic({
+        ros: ros,
+        name: "/navigation_web_status",
+        messageType: "std_msgs/String"
       });
 
-      let finished = false;
-      let goalAccepted = false;
-
-      const goal = new ROSLIB.Goal<
-        NavigateThroughPositionsGoal,
-        NavigateThroughPositionsFeedback,
-        NavigateThroughPositionsResult
-      >({
-        actionClient,
-        goalMessage: { position_names: names },
-      });
-
-      // Store for Stop/cancel
-      this.currentMultiGoal = goal;
-
-      const cleanup = () => {
-        if (finished) return;
-        finished = true;
-        this.currentMultiGoal = null;
-        console.log("Multi-navigation cleanup completed");
+      const feedbackHandler = (msg: any) => {
+        if (onFeedback) onFeedback(msg.data);
       };
+      feedbackTopic.subscribe(feedbackHandler);
 
-      // Timeout for initial goal acceptance (15s)
-      const acceptanceTimeout = setTimeout(() => {
-        if (finished) return;
-        if (!goalAccepted) {
-          console.error("Multi-goal not accepted within 15s");
-          try {
-            goal.cancel();
-          } catch (error) {
-            console.warn("Failed to cancel multi-goal during timeout:", error);
+      // 2. Call the Service to Start
+      const navService = new ROSLIB.Service({
+        ros: ros,
+        name: "/start_multi_navigation_web",
+        serviceType: "position_manager_msgs/srv/NavigateMulti"
+      });
+
+      const request = { names: names };
+
+      // Add timeout for service call
+      let responded = false;
+      const timeout = setTimeout(() => {
+        if (!responded) {
+          console.error("Multi-navigation service timeout");
+          feedbackTopic.unsubscribe(feedbackHandler);
+          reject(new Error("Service call timeout - is the ROS2 node running?"));
+        }
+      }, 10000);
+
+      navService.callService(
+        request,
+        (response: any) => {
+          responded = true;
+          clearTimeout(timeout);
+
+          if (response.success) {
+            console.log("Multi-navigation started successfully");
+            // Resolve immediately because it's async.
+            // UI will update via the feedback callback.
+            resolve({ success: true, message: response.message });
+          } else {
+            // Clean up if it failed to start
+            feedbackTopic.unsubscribe(feedbackHandler);
+            resolve({ success: false, message: response.message });
           }
-          cleanup();
-          reject(
-            new Error(
-              "Action server not responding - goal not accepted within 15s"
-            )
-          );
+        },
+        (error: any) => {
+          responded = true;
+          clearTimeout(timeout);
+          feedbackTopic.unsubscribe(feedbackHandler);
+          console.error("Multi-navigation service error:", error);
+          reject(error);
         }
-      }, 15000);
-
-      goal.on("feedback", (feedback: any) => {
-        console.log("Multi-feedback received:", JSON.stringify(feedback));
-        goalAccepted = true;
-        clearTimeout(acceptanceTimeout);
-        if (onFeedback) {
-          // Handle nested feedback structure
-          const actualFeedback = feedback?.feedback || feedback;
-          onFeedback(actualFeedback);
-        }
-      });
-
-      goal.on("status", (status: any) => {
-        console.log("Multi-status received:", JSON.stringify(status));
-        const statusCode = status?.status;
-        if (
-          statusCode === 1 ||
-          statusCode === 2 ||
-          statusCode === "ACTIVE" ||
-          statusCode === "PENDING"
-        ) {
-          if (!goalAccepted) {
-            console.log("Multi-goal accepted!");
-            goalAccepted = true;
-            clearTimeout(acceptanceTimeout);
-          }
-        }
-      });
-
-      goal.on("result", (result: any) => {
-        console.log("Multi-result received:", JSON.stringify(result));
-        clearTimeout(acceptanceTimeout);
-
-        if (finished) {
-          console.log("Already finished, ignoring multi-result");
-          return;
-        }
-
-        // Handle nested result structure
-        let actualResult = result;
-        if (result?.result !== undefined) {
-          actualResult = result.result;
-        } else if (result?.values !== undefined) {
-          actualResult = result.values;
-        }
-
-        console.log("Actual multi-result:", JSON.stringify(actualResult));
-
-        cleanup();
-        resolve({
-          success: actualResult?.success === true,
-          message: actualResult?.message ?? "",
-          positions_reached: actualResult?.positions_reached ?? 0,
-        });
-      });
-
-      goal.on("timeout", () => {
-        console.error("Multi-goal timeout event");
-        clearTimeout(acceptanceTimeout);
-        cleanup();
-        reject(new Error("Multi-navigation goal timed out"));
-      });
-
-      // Send immediately
-      console.log("Sending multi-goal...");
-      goal.send();
-      console.log("Multi-goal sent!");
+      );
     });
   }
 
