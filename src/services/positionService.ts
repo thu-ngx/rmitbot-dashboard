@@ -127,12 +127,11 @@ class PositionService {
 
       const request = {};
 
-      // Add timeout
       let responded = false;
       const timeout = setTimeout(() => {
         if (!responded) {
           console.error("Get positions service timeout");
-          reject(new Error("Service call timeout - is the ROS2 node running?"));
+          reject(new Error("Service call timeout"));
         }
       }, 10000);
 
@@ -143,20 +142,24 @@ class PositionService {
           clearTimeout(timeout);
           console.log("Get positions response:", response);
 
-          // Validate response structure
-          if (!response.names || !Array.isArray(response.names)) {
-            console.error("Invalid response structure");
+          const names = response.names || [];
+          const x_coords = response.x_coords || [];
+          const y_coords = response.y_coords || [];
+          const theta_coords = response.theta_coords || [];
+
+          if (!Array.isArray(names)) {
+            console.error("Invalid response structure: names is not an array");
             reject(new Error("Invalid response from get_positions service"));
             return;
           }
 
-          const positions: SavedPosition[] = response.names.map(
+          const positions: SavedPosition[] = names.map(
             (name: string, index: number) => ({
               id: `pos-${index}`,
               name,
-              x: response.x_coords[index] || 0,
-              y: response.y_coords[index] || 0,
-              theta: response.theta_coords[index] || 0,
+              x: x_coords[index] || 0,
+              y: y_coords[index] || 0,
+              theta: theta_coords[index] || 0,
               timestamp: Date.now(),
             })
           );
