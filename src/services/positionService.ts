@@ -265,7 +265,7 @@ class PositionService {
   async navigateThroughPositions(
     names: string[],
     onFeedback?: (status: string) => void
-  ): Promise<{ success: boolean; message: string }> {
+  ): Promise<{ success: boolean; message: string; positions_reached?: number }> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
@@ -283,8 +283,26 @@ class PositionService {
         messageType: "std_msgs/String"
       });
 
+      let serviceCallComplete = false;
+      let navigationComplete = false;
+
+      // Define cleanup function
+      const cleanup = () => {
+        feedbackTopic.unsubscribe(feedbackHandler);
+      };
+
       const feedbackHandler = (msg: any) => {
-        if (onFeedback) onFeedback(msg.data);
+        const data = msg.data;
+        if (onFeedback) onFeedback(data);
+
+        if (data.includes("Multi-navigation complete")) {
+          navigationComplete = true;
+          cleanup();
+          resolve({ success: true, message: data });
+        } 
+        else if (data.includes("Error:") || data.includes("Navigation failed")) {
+          console.log("Error when navigating to multiple positions")
+        }
       };
       feedbackTopic.subscribe(feedbackHandler);
 
@@ -297,44 +315,26 @@ class PositionService {
 
       const request = { names: names };
 
-      // Add timeout for service call
-      let responded = false;
-      const timeout = setTimeout(() => {
-        if (!responded) {
-          console.error("Multi-navigation service timeout");
-          feedbackTopic.unsubscribe(feedbackHandler);
-          reject(new Error("Service call timeout - is the ROS2 node running?"));
-        }
-      }, 10000);
-
       navService.callService(
         request,
         (response: any) => {
-          responded = true;
-          clearTimeout(timeout);
-
-          if (response.success) {
-            console.log("Multi-navigation started successfully");
-            // Resolve immediately because it's async.
-            // UI will update via the feedback callback.
-            resolve({ success: true, message: response.message });
-          } else {
-            // Clean up if it failed to start
-            feedbackTopic.unsubscribe(feedbackHandler);
+          serviceCallComplete = true;
+          if (!response.success) {
+            // If the service itself failed to start the thread
+            cleanup();
             resolve({ success: false, message: response.message });
+          } else {
+            console.log("Multi-navigation background task started...");
           }
         },
         (error: any) => {
-          responded = true;
-          clearTimeout(timeout);
-          feedbackTopic.unsubscribe(feedbackHandler);
+          cleanup();
           console.error("Multi-navigation service error:", error);
           reject(error);
         }
       );
     });
   }
-
   // Get current robot pose from /odom_ekf
   async getCurrentPose(): Promise<RobotPose> {
     return new Promise((resolve, reject) => {
