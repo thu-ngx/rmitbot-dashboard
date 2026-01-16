@@ -3,9 +3,6 @@ import { rosService } from "./ros2Connection";
 import type {
   SavedPosition,
   RobotPose,
-  NavigateToPositionGoal,
-  NavigateToPositionFeedback,
-  NavigateToPositionResult,
   NavigateThroughPositionsGoal,
   NavigateThroughPositionsFeedback,
   NavigateThroughPositionsResult,
@@ -13,11 +10,6 @@ import type {
 
 class PositionService {
   private static instance: PositionService;
-  private currentSingleGoal: ROSLIB.Goal<
-    NavigateToPositionGoal,
-    NavigateToPositionFeedback,
-    NavigateToPositionResult
-  > | null = null;
   private currentMultiGoal: ROSLIB.Goal<
     NavigateThroughPositionsGoal,
     NavigateThroughPositionsFeedback,
@@ -36,10 +28,6 @@ class PositionService {
   public cancelNavigation(): void {
     console.log("Cancelling navigation...");
     try {
-      if (this.currentSingleGoal) {
-        console.log("Cancelling single goal");
-        this.currentSingleGoal.cancel();
-      }
       if (this.currentMultiGoal) {
         console.log("Cancelling multi goal");
         this.currentMultiGoal.cancel();
@@ -47,7 +35,6 @@ class PositionService {
     } catch (e) {
       console.warn("Failed to cancel navigation:", e);
     } finally {
-      this.currentSingleGoal = null;
       this.currentMultiGoal = null;
     }
   }
@@ -209,66 +196,15 @@ class PositionService {
     });
   }
 
-  // Navigate to single position (call Service Wrapper)
-  async navigateToPosition(
-    name: string,
-    onFeedback?: (status: string) => void
-  ): Promise<{ success: boolean; message: string }> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
-      if (!rosService.isConnected) return reject(new Error("ROS not connected"));
-
-      // 1. Setup Feedback Listener
-      const feedbackTopic = new ROSLIB.Topic({
-        ros: ros,
-        name: "/navigation_web_status",
-        messageType: "std_msgs/String"
-      });
-
-      const feedbackHandler = (msg: any) => {
-        if (onFeedback) onFeedback(msg.data);
-      };
-      feedbackTopic.subscribe(feedbackHandler);
-
-      // 2. Call the Service to Start
-      // Use the 'SavePosition' service type structure for convenience
-      // Request: { name: string }
-      // Response: { success: boolean, message: string }
-      const navService = new ROSLIB.Service({
-        ros: ros,
-        name: "/start_navigation_web",
-        serviceType: "position_manager_msgs/srv/SavePosition"
-      });
-
-      const request = { name: name };
-
-      navService.callService(
-        request,
-        (response: any) => {
-          if (response.success) {
-            console.log("Navigation started successfully");
-            // Resolve immediately because it's async. 
-            // UI will update via the feedback callback.
-            resolve({ success: true, message: "Navigation started" });
-          } else {
-            // Clean up if it failed to start
-            feedbackTopic.unsubscribe(feedbackHandler);
-            resolve({ success: false, message: response.message });
-          }
-        },
-        (error: any) => {
-          feedbackTopic.unsubscribe(feedbackHandler);
-          reject(error);
-        }
-      );
-    });
-  }
-
   // Navigate through multiple positions (call Service Wrapper)
   async navigateThroughPositions(
     names: string[],
     onFeedback?: (status: string) => void
-  ): Promise<{ success: boolean; message: string; positions_reached?: number }> {
+  ): Promise<{
+    success: boolean;
+    message: string;
+    positions_reached?: number;
+  }> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
 
@@ -277,17 +213,16 @@ class PositionService {
         return;
       }
 
-      console.log(`====== Starting multi-navigation: ${names.join(", ")} ======`);
+      console.log(
+        `====== Starting multi-navigation: ${names.join(", ")} ======`
+      );
 
       // 1. Setup Feedback Listener
       const feedbackTopic = new ROSLIB.Topic({
         ros: ros,
         name: "/navigation_web_status",
-        messageType: "std_msgs/String"
+        messageType: "std_msgs/String",
       });
-
-      let serviceCallComplete = false;
-      let navigationComplete = false;
 
       // Define cleanup function
       const cleanup = () => {
@@ -299,12 +234,13 @@ class PositionService {
         if (onFeedback) onFeedback(data);
 
         if (data.includes("Multi-navigation complete")) {
-          navigationComplete = true;
           cleanup();
           resolve({ success: true, message: data });
-        } 
-        else if (data.includes("Error:") || data.includes("Navigation failed")) {
-          console.log("Error when navigating to multiple positions")
+        } else if (
+          data.includes("Error:") ||
+          data.includes("Navigation failed")
+        ) {
+          console.log("Error when navigating to multiple positions");
         }
       };
       feedbackTopic.subscribe(feedbackHandler);
@@ -313,7 +249,7 @@ class PositionService {
       const navService = new ROSLIB.Service({
         ros: ros,
         name: "/start_multi_navigation_web",
-        serviceType: "position_manager_msgs/srv/NavigateMulti"
+        serviceType: "position_manager_msgs/srv/NavigateMulti",
       });
 
       const request = { names: names };
@@ -321,7 +257,6 @@ class PositionService {
       navService.callService(
         request,
         (response: any) => {
-          serviceCallComplete = true;
           if (!response.success) {
             // If the service itself failed to start the thread
             cleanup();
@@ -338,7 +273,7 @@ class PositionService {
       );
     });
   }
-  // Get current robot pose from /odom_ekf
+  // Get current robot pose in the map frame using TF
   async getCurrentPose(): Promise<RobotPose> {
     return new Promise((resolve, reject) => {
       const ros = rosService.getROS();
@@ -348,33 +283,29 @@ class PositionService {
         return;
       }
 
-      const odomListener = new ROSLIB.Topic({
+      const tfClient = new ROSLIB.TFClient({
         ros: ros,
-        name: "/odom_ekf",
-        messageType: "nav_msgs/Odometry",
+        fixedFrame: "map",
+        angularThres: 0.01,
+        transThres: 0.01,
       });
 
       const timeout = setTimeout(() => {
-        odomListener.unsubscribe();
-        reject(new Error("Timeout getting current pose"));
+        tfClient.unsubscribe("base_footprint");
+        reject(new Error("Timeout getting current pose from TF"));
       }, 5000);
 
-      odomListener.subscribe((message: any) => {
+      tfClient.subscribe("base_footprint", (transform: ROSLIB.Transform) => {
         clearTimeout(timeout);
-        odomListener.unsubscribe();
+        tfClient.unsubscribe("base_footprint");
 
-        if (!message.pose || !message.pose.pose) {
-          reject(new Error("Invalid odometry message"));
+        if (!transform || !transform.translation || !transform.rotation) {
+          reject(new Error("Invalid TF transform"));
           return;
         }
 
-        const position = message.pose.pose.position;
-        const orientation = message.pose.pose.orientation;
-
-        if (!position || !orientation) {
-          reject(new Error("Missing position or orientation"));
-          return;
-        }
+        const position = transform.translation;
+        const orientation = transform.rotation;
 
         // Convert quaternion to yaw
         const siny_cosp =

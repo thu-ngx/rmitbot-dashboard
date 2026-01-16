@@ -7,7 +7,6 @@ import {
   MapPin,
   Save,
   Trash2,
-  Navigation,
   Play,
   Square,
   RefreshCw,
@@ -22,6 +21,7 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
   const {
     positions,
     selectedPositions,
+    selectedOrder,
     isLoading,
     isSaving,
     isNavigating,
@@ -32,7 +32,6 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
     loadPositions,
     handleSavePosition,
     handleDeletePosition,
-    handleNavigateToSingle,
     handleNavigateSelected,
     handleCancelNavigation,
     toggleSelection,
@@ -144,10 +143,14 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
               </p>
             </div>
           ) : (
-            positions.map((pos, index) => {
+            positions.map((pos) => {
               const isSelected = selectedPositions.has(pos.name);
+              const selectionOrder = selectedOrder.indexOf(pos.name);
+              const orderNumber = selectionOrder !== -1 ? selectionOrder + 1 : null;
               const isCurrentlyNavigating =
-                isNavigating && currentNavigatingIndex === index;
+                isNavigating &&
+                currentNavigatingIndex !== -1 &&
+                selectedOrder[currentNavigatingIndex] === pos.name;
 
               return (
                 <div
@@ -167,6 +170,19 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
                     className="h-4 w-4 border-slate-500 shrink-0"
                   />
 
+                  {orderNumber !== null && (
+                    <Badge
+                      variant="outline"
+                      className={`h-6 w-6 p-0 flex items-center justify-center text-xs font-bold shrink-0 ${
+                        isCurrentlyNavigating
+                          ? "bg-blue-500 text-white border-blue-400"
+                          : "bg-slate-600 text-slate-200 border-slate-500"
+                      }`}
+                    >
+                      {orderNumber}
+                    </Badge>
+                  )}
+
                   <div className="flex-1 min-w-0">
                     <div className="text-sm md:text-base font-medium text-slate-200 truncate">
                       {pos.name}
@@ -178,15 +194,6 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
                   </div>
 
                   <div className="flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity shrink-0">
-                    <Button
-                      size="sm"
-                      onClick={() => handleNavigateToSingle(pos.name)}
-                      disabled={!isConnected || isNavigating}
-                      className="h-8 w-8 p-0 bg-blue-600/80 hover:bg-blue-600 text-white"
-                      title="Navigate to this position"
-                    >
-                      <Navigation className="w-4 h-4" />
-                    </Button>
                     <Button
                       size="sm"
                       variant="ghost"

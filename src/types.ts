@@ -59,17 +59,6 @@ export interface OdometryMessage {
   };
 }
 
-export interface NavigateToPositionGoal {
-  position_name: string;
-}
-export interface NavigateToPositionResult {
-  success: boolean;
-  message: string;
-}
-export interface NavigateToPositionFeedback {
-  status?: string; 
-}
-
 export interface NavigateThroughPositionsGoal {
   position_names: string[];
 }

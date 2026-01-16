@@ -12,6 +12,7 @@ export function usePosition({ isConnected }: UsePositionProps) {
   const [selectedPositions, setSelectedPositions] = useState<Set<string>>(
     new Set()
   );
+  const [selectedOrder, setSelectedOrder] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isNavigating, setIsNavigating] = useState(false);
@@ -73,49 +74,13 @@ export function usePosition({ isConnected }: UsePositionProps) {
         await loadPositions();
         selectedPositions.delete(name);
         setSelectedPositions(new Set(selectedPositions));
+        setSelectedOrder(selectedOrder.filter((n) => n !== name));
       } else {
         toast.error("Failed to delete position");
       }
     } catch (error) {
       console.error("Error deleting position:", error);
       toast.error("Error deleting position");
-    }
-  };
-
-  const handleNavigateToSingle = async (name: string) => {
-    if (isNavigating) {
-      toast.warning("Navigation already in progress");
-      return;
-    }
-
-    setIsNavigating(true);
-    setNavigationStatus(`Starting navigation to ${name}...`);
-
-    try {
-      toast.info(`Navigating to ${name}...`);
-      console.log(`[PositionManager] Starting navigation to: ${name}`);
-
-      const result = await positionService.navigateToPosition(
-        name,
-        (status) => {
-          console.log(`[PositionManager] Feedback: ${status}`);
-          setNavigationStatus(status);
-        }
-      );
-
-      console.log(`[PositionManager] Navigation result:`, result);
-
-      if (result.success) {
-        toast.success(`Reached ${name}`);
-      } else {
-        toast.error(`Failed to reach ${name}: ${result.message}`);
-      }
-    } catch (error: any) {
-      console.error("[PositionManager] Navigation error:", error);
-      toast.error(error?.message || "Navigation error");
-    } finally {
-      setIsNavigating(false);
-      setNavigationStatus("");
     }
   };
 
@@ -130,7 +95,7 @@ export function usePosition({ isConnected }: UsePositionProps) {
       return;
     }
 
-    const selectedNames = Array.from(selectedPositions);
+    const selectedNames = selectedOrder;
     setIsNavigating(true);
     setCurrentNavigatingIndex(0);
     setNavigationStatus(
@@ -201,8 +166,10 @@ export function usePosition({ isConnected }: UsePositionProps) {
     const newSelected = new Set(selectedPositions);
     if (newSelected.has(name)) {
       newSelected.delete(name);
+      setSelectedOrder(selectedOrder.filter((n) => n !== name));
     } else {
       newSelected.add(name);
+      setSelectedOrder([...selectedOrder, name]);
     }
     setSelectedPositions(newSelected);
   };
@@ -211,6 +178,7 @@ export function usePosition({ isConnected }: UsePositionProps) {
     // State
     positions,
     selectedPositions,
+    selectedOrder,
     isLoading,
     isSaving,
     isNavigating,
@@ -225,7 +193,6 @@ export function usePosition({ isConnected }: UsePositionProps) {
     loadPositions,
     handleSavePosition,
     handleDeletePosition,
-    handleNavigateToSingle,
     handleNavigateSelected,
     handleCancelNavigation,
     toggleSelection,
