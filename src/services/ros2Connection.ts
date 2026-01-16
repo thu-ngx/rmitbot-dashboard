@@ -6,9 +6,11 @@ class RosService {
   private static instance: RosService;
   ros: ROSLIB.Ros;
   isConnected: boolean = false;
-  url: string = ROS_CONFIG.ROS_WS_URL;
+  currentIp: string = ROS_CONFIG.DEFAULT_IP;
+  url: string = `ws://${ROS_CONFIG.DEFAULT_IP}:${ROS_CONFIG.ROSBRIDGE_PORT}`;
   reconnectInterval: number = ROS_CONFIG.RECONNECT_INTERVAL;
   private isIntentionalDisconnect: boolean = false;
+  private connectionChangeCallbacks: Array<() => void> = [];
 
   private cmdVelPublisher: ROSLIB.Topic<TwistStampedMessage> | null = null;
   private odomSubscriber: ROSLIB.Topic<OdometryMessage> | null = null;
@@ -126,6 +128,34 @@ class RosService {
   disconnect() {
     this.isIntentionalDisconnect = true;
     this.ros.close();
+  }
+
+  switchRobot(newIp: string) {
+    if (newIp === this.currentIp) return;
+
+    this.isIntentionalDisconnect = true;
+    this.ros.close();
+
+    this.currentIp = newIp;
+    this.url = `ws://${newIp}:${ROS_CONFIG.ROSBRIDGE_PORT}`;
+
+    this.cmdVelPublisher = null;
+    this.odomSubscriber = null;
+
+    this.ros = new ROSLIB.Ros({ url: this.url });
+    this.setupListeners();
+
+    this.connectionChangeCallbacks.forEach(cb => cb());
+
+    this.isIntentionalDisconnect = false;
+    this.connect();
+  }
+
+  onConnectionChange(callback: () => void) {
+    this.connectionChangeCallbacks.push(callback);
+    return () => {
+      this.connectionChangeCallbacks = this.connectionChangeCallbacks.filter(cb => cb !== callback);
+    };
   }
 
   getROS() {

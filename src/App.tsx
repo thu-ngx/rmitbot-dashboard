@@ -8,11 +8,17 @@ import { PositionManager } from "./components/PositionManager";
 import { StatusDisplay } from "./components/StatusDisplay";
 import { Card } from "./components/ui/card";
 import { Switch } from "./components/ui/switch";
-import { Badge } from "./components/ui/badge";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "./components/ui/select";
 
 import { useRobot } from "./hooks/useRobot";
 import type { SpeedMode } from "./types";
-import { ROS_CONFIG } from "./config";
+import { ROBOT_OPTIONS } from "./config";
 
 export default function App() {
   const robot = useRobot();
@@ -100,12 +106,18 @@ export default function App() {
             <h1 className="text-sm md:text-lg font-bold text-white">
               Robot Control Panel
             </h1>
-            <Badge
-              variant="outline"
-              className="text-[10px] md:text-xs text-slate-300 border-slate-600 hidden sm:inline-flex"
-            >
-              {ROS_CONFIG.IP}
-            </Badge>
+            <Select value={robot.currentIp} onValueChange={robot.switchRobot}>
+              <SelectTrigger className="w-[140px] md:w-[180px] h-8 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {ROBOT_OPTIONS.map((option) => (
+                  <SelectItem key={option.ip} value={option.ip}>
+                    {option.name} ({option.ip.split(".").pop()})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
 
           <div className="flex items-center gap-2">

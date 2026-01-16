@@ -5,7 +5,7 @@ import { rosService } from "../services/ros2Connection";
 import { ROS_CONFIG } from "../config";
 
 export function useRobot() {
-  const { status, isConnected, connect, disconnect } = useRos();
+  const { status, isConnected, connect, disconnect, switchRobot, currentIp } = useRos();
 
   const [state, setState] = useState<Omit<RobotState, "isConnected">>({
     batteryLevel: 78,
@@ -152,9 +152,11 @@ export function useRobot() {
     ...state,
     isConnected,
     status,
+    currentIp,
     toggleConnection,
     setNavigationStatus,
     move,
     setSpeedMode,
+    switchRobot,
   };
 }

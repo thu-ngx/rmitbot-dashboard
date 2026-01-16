@@ -1,17 +1,20 @@
-const ROSBRIDGE_PORT = 9090;
-const ROBOT_IP = "100.122.233.111"; // RPI
-// const ROBOT_IP = "100.68.218.48"; // Ubuntu lesson 6
-// const ROBOT_IP = "100.114.20.41"; // Triet
-// const ROBOT_IP = "100.75.217.119"; // Hoa
-// const ROBOT_IP = "100.91.20.95" // Loc
+export const ROSBRIDGE_PORT = 9090;
+
+export const ROBOT_OPTIONS = [
+  { ip: "100.118.27.83", name: "RPI" },
+  { ip: "100.68.218.48", name: "Ubuntu Lesson 6" },
+  { ip: "100.114.20.41", name: "Triet" },
+  { ip: "100.75.217.119", name: "Hoa" },
+  { ip: "100.91.20.95", name: "Loc" },
+] as const;
+
+const DEFAULT_ROBOT_IP = ROBOT_OPTIONS[0].ip;
 
 export const ROS_CONFIG = {
-  IP: ROBOT_IP,
+  DEFAULT_IP: DEFAULT_ROBOT_IP,
   ROSBRIDGE_PORT,
-  ROS_WS_URL: `ws://${ROBOT_IP}:${ROSBRIDGE_PORT}`,
   RECONNECT_INTERVAL: 3000,
-  // Velocity control parameters
-  SPEED: 0.5, // default linear speed (m/s)
-  TURN: 1.0, // default angular speed (rad/s)
-  PUBLISH_RATE: 10, 
+  SPEED: 0.5,
+  TURN: 1.0,
+  PUBLISH_RATE: 10,
 };
