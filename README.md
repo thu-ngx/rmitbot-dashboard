@@ -4,7 +4,10 @@ A web-based control panel for ROS2-powered mecanum wheel robots, enabling manual
 
 This project (React WebApp + ROS2 workspace) serves as the foundation for warehouse automation implementation, where the waypoint navigation system can be extended toward full QR-based package sorting and autonomous delivery tasks.
 
-![React](https://img.shields.io/badge/React-18-blue) ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue) ![ROS2](https://img.shields.io/badge/ROS2-Jazzy-green) ![TailwindCSS](https://img.shields.io/badge/TailwindCSS-3-cyan)
+<div align="center">
+  <img src="public/screenshot.png" alt="Dashboard UI" width="800">
+  <p><em>Dashboard interface with Foxglove Studio 3D panel</em></p>
+</div>
 
 ### Key Features
 
