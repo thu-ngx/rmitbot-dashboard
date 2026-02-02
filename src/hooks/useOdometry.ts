@@ -11,8 +11,8 @@ export function useOdometry(isConnected: boolean) {
 
   useEffect(() => {
     if (!isConnected) {
-      setPose(DEFAULT_POSE);
-      setSpeed(0);
+      // Clear the callback when disconnected
+      rosService.setOdomCallback(() => {});
       return;
     }
 
@@ -34,7 +34,16 @@ export function useOdometry(isConnected: boolean) {
         console.error("Error processing odometry:", error);
       }
     });
+
+    // Cleanup on unmount or when isConnected changes
+    return () => {
+      rosService.setOdomCallback(() => {});
+    };
   }, [isConnected]);
 
-  return { pose, speed };
+  // Reset values when disconnected (outside useEffect)
+  const displayPose = isConnected ? pose : DEFAULT_POSE;
+  const displaySpeed = isConnected ? speed : 0;
+
+  return { pose: displayPose, speed: displaySpeed };
 }
