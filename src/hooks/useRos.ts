@@ -1,68 +1,29 @@
-import { useEffect, useState, useCallback } from "react";
-import { rosService } from "../services/ros2Connection";
-import { ROS_CONFIG } from "../config";
-
-export type RosStatus = "CONNECTED" | "DISCONNECTED" | "ERROR" | "CONNECTING";
+import { useCallback } from "react";
+import { rosService } from "@/services/ros2Connection";
+import { useConnectionStore } from "@/stores/connectionStore";
 
 export function useRos() {
-  const [status, setStatus] = useState<RosStatus>("DISCONNECTED");
-  const [currentIp, setCurrentIp] = useState<string>(ROS_CONFIG.DEFAULT_IP);
+  const status = useConnectionStore((state) => state.status);
+  const currentIp = useConnectionStore((state) => state.currentIp);
+  const setStatus = useConnectionStore((state) => state.setStatus);
 
-  const setupListeners = useCallback(() => {
-    const ros = rosService.getROS();
-
-    const handleConnect = () => setStatus("CONNECTED");
-    const handleClose = () => setStatus("DISCONNECTED");
-    const handleError = () => setStatus("ERROR");
-
-    ros.on("connection", handleConnect);
-    ros.on("close", handleClose);
-    ros.on("error", handleError);
-
-    return () => {
-      ros.off("connection", handleConnect);
-      ros.off("close", handleClose);
-      ros.off("error", handleError);
-    };
-  }, []);
-
-  useEffect(() => {
-    const cleanup = setupListeners();
-
-    const ros = rosService.getROS();
-    if (rosService.isConnected || ros.isConnected) {
-      setStatus("CONNECTED");
-    } else {
-      rosService.connect();
-    }
-
-    const unsubscribe = rosService.onConnectionChange(() => {
-      cleanup();
-      setupListeners();
-      setCurrentIp(rosService.currentIp);
-    });
-
-    return () => {
-      cleanup();
-      unsubscribe();
-    };
-  }, [setupListeners]);
-
-  const connect = () => {
+  const connect = useCallback(() => {
     setStatus("CONNECTING");
     rosService.connect();
-  };
+  }, [setStatus]);
 
-  const disconnect = () => {
+  const disconnect = useCallback(() => {
     rosService.disconnect();
-  };
+  }, []);
 
-  const switchRobot = (newIp: string) => {
-    if (newIp === currentIp) return;
-    setStatus("CONNECTING");
-    setCurrentIp(newIp);
-    rosService.switchRobot(newIp);
-  };
+  const switchRobot = useCallback(
+    (newIp: string) => {
+      if (newIp === currentIp) return;
+      setStatus("CONNECTING");
+      rosService.switchRobot(newIp);
+    },
+    [currentIp, setStatus],
+  );
 
   return {
     status,

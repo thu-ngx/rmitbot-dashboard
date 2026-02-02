@@ -72,3 +72,15 @@ export interface NavigateThroughPositionsResult {
   message: string;
   positions_reached: number;
 }
+
+export type ConnectionStatus =
+  | "CONNECTED"
+  | "DISCONNECTED"
+  | "CONNECTING"
+  | "ERROR";
+
+export interface NavigationFeedback {
+  current_position_name?: string;
+  current_position_index?: number;
+  progress_percentage?: number;
+}

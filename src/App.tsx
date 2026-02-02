@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
 import { Wifi } from "lucide-react";
 
@@ -17,83 +17,43 @@ import {
 } from "./components/ui/select";
 
 import { useRobot } from "./hooks/useRobot";
-import type { SpeedMode } from "./types";
 import { ROBOT_OPTIONS } from "./config";
+import { MOVEMENT_COMMANDS } from "./constants/ros";
+import type { ConnectionStatus } from "./types";
 
-export default function App() {
-  const robot = useRobot();
-  const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-  const handleSpeedChange = (mode: SpeedMode) => {
-    setSpeedMode(mode);
-    robot.setSpeedMode(mode);
+const STATUS_CONFIG: Record<ConnectionStatus, { color: string; text: string }> =
+  {
+    CONNECTED: { color: "text-green-400", text: "ONLINE" },
+    CONNECTING: { color: "text-yellow-400", text: "CONNECTING..." },
+    ERROR: { color: "text-red-500", text: "ERROR" },
+    DISCONNECTED: { color: "text-slate-600", text: "OFFLINE" },
   };
+
+function AppContent() {
+  const robot = useRobot();
 
   const handleCommand = (cmd: string) => {
-    if (!robot.isConnected) return toast.error("Robot Offline");
+    if (!robot.isConnected) {
+      toast.error("Robot Offline");
+      return;
+    }
 
-    switch (cmd) {
-      case "forward":
-        robot.move(1.0, 0, 0);
-        break;
-      case "backward":
-        robot.move(-1.0, 0, 0);
-        break;
-      case "left":
-        robot.move(0, 1.0, 0);
-        break;
-      case "right":
-        robot.move(0, -1.0, 0);
-        break;
-      case "stop":
-        robot.move(0, 0, 0);
-        break;
-      case "forward-left":
-        robot.move(0.707, 0.707, 0);
-        break;
-      case "forward-right":
-        robot.move(0.707, -0.707, 0);
-        break;
-      case "backward-left":
-        robot.move(-0.707, 0.707, 0);
-        break;
-      case "backward-right":
-        robot.move(-0.707, -0.707, 0);
-        break;
-      case "rotate-left":
-        robot.move(0, 0, 1.0);
-        break;
-      case "rotate-right":
-        robot.move(0, 0, -1.0);
-        break;
+    const velocity = MOVEMENT_COMMANDS[cmd];
+    if (velocity) {
+      robot.move(...velocity);
     }
   };
 
-  const getStatusColor = () => {
-    switch (robot.status) {
-      case "CONNECTED":
-        return "text-green-400";
-      case "CONNECTING":
-        return "text-yellow-400";
-      case "ERROR":
-        return "text-red-500";
-      default:
-        return "text-slate-600";
-    }
-  };
-
-  const getStatusText = () => {
-    switch (robot.status) {
-      case "CONNECTED":
-        return "ONLINE";
-      case "CONNECTING":
-        return "CONNECTING...";
-      case "ERROR":
-        return "ERROR";
-      default:
-        return "OFFLINE";
-    }
-  };
+  const { color: statusColor, text: statusText } =
+    STATUS_CONFIG[robot.status] ?? STATUS_CONFIG.DISCONNECTED;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 text-white">
@@ -121,11 +81,9 @@ export default function App() {
           </div>
 
           <div className="flex items-center gap-2">
-            <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${getStatusColor()}`} />
-            <span
-              className={`text-[10px] md:text-xs font-bold ${getStatusColor()}`}
-            >
-              {getStatusText()}
+            <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${statusColor}`} />
+            <span className={`text-[10px] md:text-xs font-bold ${statusColor}`}>
+              {statusText}
             </span>
             <Switch
               checked={robot.isConnected}
@@ -135,28 +93,25 @@ export default function App() {
         </div>
       </div>
 
-      {/* Main Content - Responsive Grid */}
+      {/* Main Content */}
       <div className="container mx-auto px-4 py-4 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[calc(100vh-120px)]">
-          {/* Left Column: Position Manager - Full width on mobile, 8 cols on desktop */}
+          {/* Left Column */}
           <div className="lg:col-span-8">
             <PositionManager isConnected={robot.isConnected} />
           </div>
 
-          {/* Right Column: Status + Control - Full width on mobile, 4 cols on desktop */}
+          {/* Right Column */}
           <div className="lg:col-span-4 flex flex-col gap-4">
-            {/* Status Display */}
             <StatusDisplay isConnected={robot.isConnected} />
 
-            {/* Control Card */}
             <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
-              {/* Speed Control */}
               <h2 className="text-sm font-semibold mb-3 text-white">
                 Speed Control
               </h2>
               <SpeedControl
-                selectedMode={speedMode}
-                onModeChange={handleSpeedChange}
+                selectedMode={robot.speedMode}
+                onModeChange={robot.setSpeedMode}
                 disabled={false}
               />
 
@@ -171,7 +126,6 @@ export default function App() {
               </div>
             </Card>
 
-            {/* Quick Start Guide */}
             <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
               <h2 className="text-sm font-semibold mb-3 text-white">
                 Quick Start
@@ -187,5 +141,13 @@ export default function App() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AppContent />
+    </QueryClientProvider>
   );
 }

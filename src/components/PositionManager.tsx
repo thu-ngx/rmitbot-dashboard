@@ -1,41 +1,73 @@
+import { useState } from "react";
+import { toast } from "sonner";
 import { Card, CardHeader, CardTitle, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
 import { Checkbox } from "./ui/checkbox";
 import { Badge } from "./ui/badge";
+import { MapPin, Save, Trash2, Play, Square, RefreshCw } from "lucide-react";
+
 import {
-  MapPin,
-  Save,
-  Trash2,
-  Play,
-  Square,
-  RefreshCw,
-} from "lucide-react";
-import { usePosition } from "@/hooks/usePosition";
+  usePositions,
+  useSavePosition,
+  useDeletePosition,
+} from "@/hooks/usePositions";
+import { useSelectionStore } from "@/stores/selectionStore";
+import { useNavigationStore } from "@/stores/navigationStore";
 
 interface PositionManagerProps {
   isConnected: boolean;
 }
 
 export function PositionManager({ isConnected }: PositionManagerProps) {
+  const [newPositionName, setNewPositionName] = useState("");
+
+  // React Query
   const {
-    positions,
-    selectedPositions,
-    selectedOrder,
+    data: positions = [],
     isLoading,
-    isSaving,
+    refetch,
+  } = usePositions(isConnected);
+  const savePositionMutation = useSavePosition();
+  const deletePositionMutation = useDeletePosition();
+
+  // Zustand stores
+  const { selectedPositions, selectedOrder, toggleSelection, clearSelection } =
+    useSelectionStore();
+  const {
     isNavigating,
-    newPositionName,
-    currentNavigatingIndex,
-    navigationStatus,
-    setNewPositionName,
-    loadPositions,
-    handleSavePosition,
-    handleDeletePosition,
-    handleNavigateSelected,
-    handleCancelNavigation,
-    toggleSelection,
-  } = usePosition({ isConnected });
+    currentIndex,
+    status: navigationStatus,
+    startNavigation,
+    cancelNavigation,
+  } = useNavigationStore();
+
+  const handleSavePosition = () => {
+    const name = newPositionName.trim();
+    if (!name) {
+      toast.error("Please enter a position name");
+      return;
+    }
+    savePositionMutation.mutate(name, {
+      onSuccess: () => setNewPositionName(""),
+    });
+  };
+
+  const handleNavigateSelected = async () => {
+    if (selectedOrder.length === 0) {
+      toast.error("No positions selected");
+      return;
+    }
+
+    try {
+      toast.info(`Navigating through ${selectedOrder.length} positions...`);
+      await startNavigation(selectedOrder);
+      toast.success("Navigation completed!");
+      clearSelection();
+    } catch {
+      toast.error("Navigation failed");
+    }
+  };
 
   return (
     <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm h-full flex flex-col">
@@ -55,14 +87,12 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
             <Button
               size="sm"
               variant="ghost"
-              onClick={loadPositions}
+              onClick={() => refetch()}
               disabled={!isConnected || isLoading}
               className="h-7 w-7 p-0 hover:bg-slate-700/50"
             >
               <RefreshCw
-                className={`w-3 h-3 text-slate-300 ${
-                  isLoading ? "animate-spin" : ""
-                }`}
+                className={`w-3 h-3 text-slate-300 ${isLoading ? "animate-spin" : ""}`}
               />
             </Button>
           </div>
@@ -76,7 +106,7 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
             placeholder="Position name..."
             value={newPositionName}
             onChange={(e) => setNewPositionName(e.target.value)}
-            disabled={!isConnected || isSaving}
+            disabled={!isConnected || savePositionMutation.isPending}
             className="h-8 text-xs bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
             onKeyPress={(e) => e.key === "Enter" && handleSavePosition()}
           />
@@ -84,11 +114,13 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
             size="sm"
             onClick={handleSavePosition}
             disabled={
-              !isConnected || isSaving || !newPositionName.trim()
+              !isConnected ||
+              savePositionMutation.isPending ||
+              !newPositionName.trim()
             }
             className="h-8 px-3 bg-green-600 hover:bg-green-700 text-white border-0 whitespace-nowrap"
           >
-            {isSaving ? (
+            {savePositionMutation.isPending ? (
               <RefreshCw className="w-3 h-3 animate-spin" />
             ) : (
               <>
@@ -123,7 +155,7 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
               <Button
                 size="sm"
                 variant="destructive"
-                onClick={handleCancelNavigation}
+                onClick={cancelNavigation}
                 className="flex-1 h-8 text-xs"
               >
                 <Square className="w-3 h-3 mr-1" />
@@ -146,11 +178,12 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
             positions.map((pos) => {
               const isSelected = selectedPositions.has(pos.name);
               const selectionOrder = selectedOrder.indexOf(pos.name);
-              const orderNumber = selectionOrder !== -1 ? selectionOrder + 1 : null;
+              const orderNumber =
+                selectionOrder !== -1 ? selectionOrder + 1 : null;
               const isCurrentlyNavigating =
                 isNavigating &&
-                currentNavigatingIndex !== -1 &&
-                selectedOrder[currentNavigatingIndex] === pos.name;
+                currentIndex !== -1 &&
+                selectedOrder[currentIndex] === pos.name;
 
               return (
                 <div
@@ -159,8 +192,8 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
                     isCurrentlyNavigating
                       ? "bg-blue-500/20 border-blue-400/50"
                       : isSelected
-                      ? "bg-slate-700/50 border-slate-600"
-                      : "bg-slate-800/40 border-slate-700/40 hover:bg-slate-700/30"
+                        ? "bg-slate-700/50 border-slate-600"
+                        : "bg-slate-800/40 border-slate-700/40 hover:bg-slate-700/30"
                   }`}
                 >
                   <Checkbox
@@ -197,8 +230,12 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => handleDeletePosition(pos.name)}
-                      disabled={!isConnected || isNavigating}
+                      onClick={() => deletePositionMutation.mutate(pos.name)}
+                      disabled={
+                        !isConnected ||
+                        isNavigating ||
+                        deletePositionMutation.isPending
+                      }
                       className="h-8 w-8 p-0 hover:bg-red-500/20 text-red-400"
                       title="Delete position"
                     >
