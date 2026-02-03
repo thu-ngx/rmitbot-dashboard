@@ -1,20 +1,49 @@
 import * as ROSLIB from "roslib";
 import { rosService } from "./ros2Connection";
-import type {
-  SavedPosition,
-  RobotPose,
-  NavigateThroughPositionsGoal,
-  NavigateThroughPositionsFeedback,
-  NavigateThroughPositionsResult,
-} from "@/types";
+import type { SavedPosition } from "@/types";
+
+// Constants
+const SERVICE_TIMEOUT_MS = 10_000;
+
+const ROS_SERVICES = {
+  SAVE_POSITION: "/save_position",
+  GET_POSITIONS: "/get_positions",
+  DELETE_POSITION: "/delete_position",
+  NAVIGATE_MULTI: "/start_multi_navigation_web",
+} as const;
+
+const ROS_SERVICE_TYPES = {
+  SAVE_POSITION: "position_manager_msgs/srv/SavePosition",
+  GET_POSITIONS: "position_manager_msgs/srv/GetPositions",
+  DELETE_POSITION: "position_manager_msgs/srv/DeletePosition",
+  NAVIGATE_MULTI: "position_manager_msgs/srv/NavigateMulti",
+} as const;
+
+// Response types
+interface SavePositionResponse {
+  success: boolean;
+  message: string;
+}
+
+interface GetPositionsResponse {
+  names: string[];
+  x_coords: number[];
+  y_coords: number[];
+  theta_coords: number[];
+}
+
+interface DeletePositionResponse {
+  success: boolean;
+  message: string;
+}
+
+interface NavigateMultiResponse {
+  success: boolean;
+  message: string;
+}
 
 class PositionService {
   private static instance: PositionService;
-  private currentMultiGoal: ROSLIB.Goal<
-    NavigateThroughPositionsGoal,
-    NavigateThroughPositionsFeedback,
-    NavigateThroughPositionsResult
-  > | null = null;
 
   private constructor() {}
 
@@ -25,181 +54,123 @@ class PositionService {
     return PositionService.instance;
   }
 
-  public cancelNavigation(): void {
-    console.log("Cancelling navigation...");
-    try {
-      if (this.currentMultiGoal) {
-        console.log("Cancelling multi goal");
-        this.currentMultiGoal.cancel();
+  /**
+   * Generic service call wrapper with timeout
+   */
+  private callService<TRequest, TResponse>(
+    serviceName: string,
+    serviceType: string,
+    request: TRequest,
+    timeoutMs = SERVICE_TIMEOUT_MS,
+  ): Promise<TResponse> {
+    return new Promise((resolve, reject) => {
+      const ros = rosService.getROS();
+
+      if (!rosService.isConnected) {
+        reject(new Error("ROS not connected"));
+        return;
       }
-    } catch (e) {
-      console.warn("Failed to cancel navigation:", e);
-    } finally {
-      this.currentMultiGoal = null;
-    }
+
+      const service = new ROSLIB.Service({
+        ros,
+        name: serviceName,
+        serviceType,
+      });
+
+      let responded = false;
+      const timeout = setTimeout(() => {
+        if (!responded) {
+          reject(new Error(`Service timeout: ${serviceName}`));
+        }
+      }, timeoutMs);
+
+      service.callService(
+        request,
+        (response: any) => {
+          responded = true;
+          clearTimeout(timeout);
+          resolve(response);
+        },
+        (error: string) => {
+          responded = true;
+          clearTimeout(timeout);
+          reject(new Error(error));
+        },
+      );
+    });
   }
 
-  // Save current position (Service)
+  /**
+   * Save current robot position with a name
+   */
   async savePosition(
-    name: string
+    name: string,
   ): Promise<{ success: boolean; message: string }> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
+    console.log(`Saving position: ${name}`);
 
-      if (!rosService.isConnected) {
-        console.error("Cannot save position: ROS not connected");
-        reject(new Error("ROS not connected"));
-        return;
-      }
+    const response = await this.callService<
+      { name: string },
+      SavePositionResponse
+    >(ROS_SERVICES.SAVE_POSITION, ROS_SERVICE_TYPES.SAVE_POSITION, { name });
 
-      console.log(`Saving position: ${name}`);
-
-      const savePositionService = new ROSLIB.Service({
-        ros: ros,
-        name: "/save_position",
-        serviceType: "position_manager_msgs/srv/SavePosition",
-      });
-
-      const request = { name };
-
-      // Add timeout for service call
-      let responded = false;
-      const timeout = setTimeout(() => {
-        if (!responded) {
-          console.error("Save position service timeout");
-          reject(new Error("Service call timeout - is the ROS2 node running?"));
-        }
-      }, 10000);
-
-      savePositionService.callService(
-        request,
-        (response: any) => {
-          responded = true;
-          clearTimeout(timeout);
-          console.log("Save response:", response);
-
-          resolve({
-            success: response.success,
-            message: response.message || "Unknown response",
-          });
-        },
-        (error: any) => {
-          responded = true;
-          clearTimeout(timeout);
-          console.error("Save position service error:", error);
-          reject(error);
-        }
-      );
-    });
+    console.log("Save response:", response);
+    return {
+      success: response.success,
+      message: response.message || "Unknown response",
+    };
   }
 
-  // Get all positions (Service)
+  /**
+   * Get all saved positions
+   */
   async getPositions(): Promise<SavedPosition[]> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
+    console.log("Getting positions...");
 
-      if (!rosService.isConnected) {
-        console.error("Cannot get positions: ROS not connected");
-        reject(new Error("ROS not connected"));
-        return;
-      }
+    const response = await this.callService<
+      Record<string, never>,
+      GetPositionsResponse
+    >(ROS_SERVICES.GET_POSITIONS, ROS_SERVICE_TYPES.GET_POSITIONS, {});
 
-      console.log("Getting positions...");
+    console.log("Get positions response:", response);
 
-      const getPositionsService = new ROSLIB.Service({
-        ros: ros,
-        name: "/get_positions",
-        serviceType: "position_manager_msgs/srv/GetPositions",
-      });
+    const names = response.names || [];
+    const xCoords = response.x_coords || [];
+    const yCoords = response.y_coords || [];
+    const thetaCoords = response.theta_coords || [];
 
-      const request = {};
-
-      let responded = false;
-      const timeout = setTimeout(() => {
-        if (!responded) {
-          console.error("Get positions service timeout");
-          reject(new Error("Service call timeout"));
-        }
-      }, 10000);
-
-      getPositionsService.callService(
-        request,
-        (response: any) => {
-          responded = true;
-          clearTimeout(timeout);
-          console.log("Get positions response:", response);
-
-          const names = response.names || [];
-          const x_coords = response.x_coords || [];
-          const y_coords = response.y_coords || [];
-          const theta_coords = response.theta_coords || [];
-
-          if (!Array.isArray(names)) {
-            console.error("Invalid response structure: names is not an array");
-            reject(new Error("Invalid response from get_positions service"));
-            return;
-          }
-
-          const positions: SavedPosition[] = names.map(
-            (name: string, index: number) => ({
-              id: `pos-${index}`,
-              name,
-              x: x_coords[index] || 0,
-              y: y_coords[index] || 0,
-              theta: theta_coords[index] || 0,
-              timestamp: Date.now(),
-            })
-          );
-          resolve(positions);
-        },
-        (error: any) => {
-          responded = true;
-          clearTimeout(timeout);
-          console.error("Get positions service error:", error);
-          reject(error);
-        }
-      );
-    });
+    return names.map((name, index) => ({
+      id: `pos-${index}`,
+      name,
+      x: xCoords[index] || 0,
+      y: yCoords[index] || 0,
+      theta: thetaCoords[index] || 0,
+      timestamp: Date.now(),
+    }));
   }
 
-  // Delete position (Service)
+  /**
+   * Delete a position by name
+   */
   async deletePosition(name: string): Promise<boolean> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
+    console.log(`Deleting position: ${name}`);
 
-      if (!rosService.isConnected) {
-        reject(new Error("ROS not connected"));
-        return;
-      }
-
-      console.log(`Deleting position: ${name}`);
-
-      const deletePositionService = new ROSLIB.Service({
-        ros: ros,
-        name: "/delete_position",
-        serviceType: "position_manager_msgs/srv/DeletePosition",
-      });
-
-      const request = { name };
-
-      deletePositionService.callService(
-        request,
-        (response: any) => {
-          console.log("Delete response:", response);
-          resolve(response.success);
-        },
-        (error: any) => {
-          console.error("Delete position failed:", error);
-          reject(error);
-        }
-      );
+    const response = await this.callService<
+      { name: string },
+      DeletePositionResponse
+    >(ROS_SERVICES.DELETE_POSITION, ROS_SERVICE_TYPES.DELETE_POSITION, {
+      name,
     });
+
+    console.log("Delete response:", response);
+    return response.success;
   }
 
-  // Navigate through multiple positions (call Service Wrapper)
+  /**
+   * Navigate through multiple positions
+   */
   async navigateThroughPositions(
     names: string[],
-    onFeedback?: (status: string) => void
+    onFeedback?: (status: string) => void,
   ): Promise<{
     success: boolean;
     message: string;
@@ -213,18 +184,15 @@ class PositionService {
         return;
       }
 
-      console.log(
-        `====== Starting multi-navigation: ${names.join(", ")} ======`
-      );
+      console.log(`Starting multi-navigation: ${names.join(", ")}`);
 
-      // 1. Setup Feedback Listener
+      // Setup feedback listener
       const feedbackTopic = new ROSLIB.Topic({
-        ros: ros,
+        ros,
         name: "/navigation_web_status",
         messageType: "std_msgs/String",
       });
 
-      // Define cleanup function
       const cleanup = () => {
         feedbackTopic.unsubscribe(feedbackHandler);
       };
@@ -240,88 +208,53 @@ class PositionService {
           data.includes("Error:") ||
           data.includes("Navigation failed")
         ) {
-          console.log("Error when navigating to multiple positions");
+          console.log("Error during multi-navigation");
         }
       };
+
       feedbackTopic.subscribe(feedbackHandler);
 
-      // 2. Call the Service to Start
-      const navService = new ROSLIB.Service({
-        ros: ros,
-        name: "/start_multi_navigation_web",
-        serviceType: "position_manager_msgs/srv/NavigateMulti",
-      });
-
-      const request = { names: names };
-
-      navService.callService(
-        request,
-        (response: any) => {
+      // Call the service to start navigation
+      this.callService<{ names: string[] }, NavigateMultiResponse>(
+        ROS_SERVICES.NAVIGATE_MULTI,
+        ROS_SERVICE_TYPES.NAVIGATE_MULTI,
+        { names },
+      )
+        .then((response) => {
           if (!response.success) {
-            // If the service itself failed to start the thread
             cleanup();
             resolve({ success: false, message: response.message });
           } else {
             console.log("Multi-navigation background task started...");
           }
-        },
-        (error: any) => {
+        })
+        .catch((error) => {
           cleanup();
-          console.error("Multi-navigation service error:", error);
           reject(error);
-        }
-      );
+        });
     });
   }
-  // Get current robot pose in the map frame using TF
-  async getCurrentPose(): Promise<RobotPose> {
-    return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
 
-      if (!rosService.isConnected) {
-        reject(new Error("ROS not connected"));
-        return;
-      }
-
-      const tfClient = new ROSLIB.TFClient({
-        ros: ros,
-        fixedFrame: "map",
-        angularThres: 0.01,
-        transThres: 0.01,
+  /**
+   * Cancel ongoing navigation
+   */
+  cancelNavigation(): void {
+    console.log("Cancelling navigation...");
+    const ros = rosService.getROS();
+    if (rosService.isConnected) {
+      const service = new ROSLIB.Service({
+        ros,
+        name: "/cancel_navigation",
+        serviceType: "std_srvs/Trigger",
       });
-
-      const timeout = setTimeout(() => {
-        tfClient.unsubscribe("base_footprint");
-        reject(new Error("Timeout getting current pose from TF"));
-      }, 5000);
-
-      tfClient.subscribe("base_footprint", (transform: ROSLIB.Transform) => {
-        clearTimeout(timeout);
-        tfClient.unsubscribe("base_footprint");
-
-        if (!transform || !transform.translation || !transform.rotation) {
-          reject(new Error("Invalid TF transform"));
-          return;
-        }
-
-        const position = transform.translation;
-        const orientation = transform.rotation;
-
-        // Convert quaternion to yaw
-        const siny_cosp =
-          2 * (orientation.w * orientation.z + orientation.x * orientation.y);
-        const cosy_cosp =
-          1 -
-          2 * (orientation.y * orientation.y + orientation.z * orientation.z);
-        const theta = Math.atan2(siny_cosp, cosy_cosp);
-
-        resolve({
-          x: position.x,
-          y: position.y,
-          theta: theta,
-        });
-      });
-    });
+      service.callService(
+        {},
+        (res) => {
+          console.log("Cancelled", res);
+        },
+        (err) => console.error(err),
+      );
+    }
   }
 }
 
