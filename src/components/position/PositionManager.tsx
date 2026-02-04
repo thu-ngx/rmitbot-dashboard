@@ -41,14 +41,6 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
     cancelNavigation,
   } = useNavigationStore();
 
-  const handleSavePosition = (name: string) => {
-    savePositionMutation.mutate(name);
-  };
-
-  const handleDeletePosition = (name: string) => {
-    deletePositionMutation.mutate(name);
-  };
-
   const handleNavigate = async () => {
     if (selectedOrder.length === 0) {
       toast.error("No positions selected");
@@ -99,7 +91,7 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
         <SavePositionForm
           disabled={!isConnected}
           isSaving={savePositionMutation.isPending}
-          onSave={handleSavePosition}
+          onSave={savePositionMutation.mutate}
         />
 
         <NavigationControls
@@ -124,7 +116,7 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
               : null
           }
           onToggleSelect={toggleSelection}
-          onDelete={handleDeletePosition}
+          onDelete={deletePositionMutation.mutate}
         />
       </CardContent>
     </Card>

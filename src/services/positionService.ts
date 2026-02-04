@@ -1,23 +1,7 @@
 import * as ROSLIB from "roslib";
 import { rosService } from "./ros2Connection";
 import type { SavedPosition } from "@/types";
-
-// Constants
-const SERVICE_TIMEOUT_MS = 10_000;
-
-const ROS_SERVICES = {
-  SAVE_POSITION: "/save_position",
-  GET_POSITIONS: "/get_positions",
-  DELETE_POSITION: "/delete_position",
-  NAVIGATE_MULTI: "/start_multi_navigation_web",
-} as const;
-
-const ROS_SERVICE_TYPES = {
-  SAVE_POSITION: "position_manager_msgs/srv/SavePosition",
-  GET_POSITIONS: "position_manager_msgs/srv/GetPositions",
-  DELETE_POSITION: "position_manager_msgs/srv/DeletePosition",
-  NAVIGATE_MULTI: "position_manager_msgs/srv/NavigateMulti",
-} as const;
+import { ROS_SERVICES, ROS_SERVICE_TYPES, SERVICE_TIMEOUT_MS } from "@/constants/ros";
 
 // Response types
 interface SavePositionResponse {
@@ -86,10 +70,10 @@ class PositionService {
 
       service.callService(
         request,
-        (response: any) => {
+        (response: unknown) => {
           responded = true;
           clearTimeout(timeout);
-          resolve(response);
+          resolve(response as TResponse);
         },
         (error: string) => {
           responded = true;
@@ -197,8 +181,10 @@ class PositionService {
         feedbackTopic.unsubscribe(feedbackHandler);
       };
 
-      const feedbackHandler = (msg: any) => {
-        const data = msg.data;
+      const feedbackHandler = (msg: unknown) => {
+        const data = (msg as { data?: string }).data;
+        if (!data) return;
+
         if (onFeedback) onFeedback(data);
 
         if (data.includes("Multi-navigation complete")) {

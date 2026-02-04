@@ -1,7 +1,6 @@
 import { Leaf, Gauge, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
-
-export type SpeedMode = "eco" | "normal" | "fast";
+import type { SpeedMode } from "@/types";
 
 interface SpeedControlProps {
   selectedMode: SpeedMode;

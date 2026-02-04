@@ -2,8 +2,9 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster, toast } from "sonner";
 
 import { Header } from "@/components/Header";
-import { PositionManager } from "@/components/position";
-import { ControlButtons, SpeedControl } from "@/components/control";
+import { PositionManager } from "@/components/position/PositionManager";
+import { ControlButtons } from "@/components/control/ControlButtons";
+import { SpeedControl } from "@/components/control/SpeedControl";
 import { StatusDisplay } from "@/components/StatusDisplay";
 import { QuickStartCard } from "@/components/QuickStartCard";
 import { Card } from "@/components/ui/card";

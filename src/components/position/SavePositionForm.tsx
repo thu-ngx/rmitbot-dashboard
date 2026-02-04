@@ -24,7 +24,7 @@ export function SavePositionForm({
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "Enter") {
       handleSave();
     }
@@ -38,7 +38,7 @@ export function SavePositionForm({
         onChange={(e) => setName(e.target.value)}
         disabled={disabled || isSaving}
         className="h-8 text-xs bg-slate-800/50 border-slate-700 text-slate-200 placeholder:text-slate-500"
-        onKeyPress={handleKeyPress}
+        onKeyDown={handleKeyDown}
       />
       <Button
         size="sm"

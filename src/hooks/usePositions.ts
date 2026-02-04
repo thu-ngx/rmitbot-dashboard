@@ -37,7 +37,7 @@ export function useSavePosition() {
     },
     onError: (error: Error) => {
       console.error("Error saving position:", error);
-      toast.error("Error saving position");
+      toast.error(error.message || "Error saving position");
     },
   });
 }
@@ -64,7 +64,7 @@ export function useDeletePosition() {
     },
     onError: (error: Error) => {
       console.error("Error deleting position:", error);
-      toast.error("Error deleting position");
+      toast.error(error.message || "Error deleting position");
     },
   });
 }
