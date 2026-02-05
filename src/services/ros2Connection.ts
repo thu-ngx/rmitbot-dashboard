@@ -76,7 +76,7 @@ class RosService {
     });
 
     try {
-      this.odomSubscriber.subscribe((message: any) => {
+      this.odomSubscriber.subscribe((message: unknown) => {
         if (this.odomCallback) {
           this.odomCallback(message as OdometryMessage);
         }

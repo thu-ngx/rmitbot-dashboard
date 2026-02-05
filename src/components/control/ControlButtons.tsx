@@ -51,6 +51,8 @@ const DIRECTION_GRID: DirectionButton[][] = [
   ],
 ];
 
+const DIRECTION_BUTTONS = DIRECTION_GRID.flat();
+
 const ROTATION_BUTTONS: RotationButton[] = [
   { command: "rotate-left", icon: RotateCcw, color: "indigo", label: "Left" },
   { command: "rotate-right", icon: RotateCw, color: "indigo", label: "Right" },
@@ -85,7 +87,7 @@ export function ControlButtons({
     <div className="space-y-2">
       {/* Directional Controls Grid */}
       <div className="grid grid-cols-3 gap-1.5">
-        {DIRECTION_GRID.flat().map((btn) => {
+        {DIRECTION_BUTTONS.map((btn) => {
           const Icon = btn.icon;
           const isStop = btn.command === "stop";
 

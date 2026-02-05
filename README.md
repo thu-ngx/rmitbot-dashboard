@@ -22,44 +22,39 @@ This project (React WebApp + ROS2 workspace) serves as the foundation for wareho
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Web Browser                              │
-│  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐   │
-│  │ControlButtons│  │ StatusDisplay│  │  PositionManager     │   │
-│  └──────┬───────┘  └──────┬───────┘  └──────────┬───────────┘   │
-│         │                 │                     │               │
-│  ┌──────┴─────────────────┴─────────────────────┴────────────┐  │
-│  │                    Hooks Layer                            │  │
-│  │   useRobot (movement)    usePosition (waypoints)          │  │
-│  └──────────────────────────┬────────────────────────────────┘  │
-│                             │                                   │
-│  ┌──────────────────────────┴────────────────────────────────┐  │
-│  │                   Services Layer                          │  │
-│  │   rosService (connection)    positionService (waypoints)  │  │
-│  └──────────────────────────┬────────────────────────────────┘  │
-└─────────────────────────────┼───────────────────────────────────┘
-                              │ WebSocket (JSON)
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                    rosbridge_server:9090                        │
-└─────────────────────────────┬───────────────────────────────────┘
-                              │ DDS
-                              ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         ROS2 Nodes                              │
-│        (See Related resources for ROS2 packages)                │
+│                        React Components                         │
+│  (App, Header, PositionManager, ControlButtons, StatusDisplay)  │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ uses
+┌─────────────────────────▼───────────────────────────────────────┐
+│                         Custom Hooks                            │
+│             (useRobot, useOdometry, usePositions)               │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ reads/writes
+┌─────────────────────────▼───────────────────────────────────────┐
+│                       Zustand Stores                            │
+│       (connectionStore, selectionStore, navigationStore)        │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ interacts with
+┌─────────────────────────▼───────────────────────────────────────┐
+│                         Services                                │
+│                 (rosService, positionService)                   │
+└─────────────────────────┬───────────────────────────────────────┘
+                          │ WebSocket (port 9090)
+┌─────────────────────────▼───────────────────────────────────────┐
+│                    ROS2 (via rosbridge)                         │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
 ## Tech Stack
 
-| Category          | Technology               |
-| ----------------- | ------------------------ |
-| Framework         | React + TypeScript       |
-| Styling           | TailwindCSS + shadcn/ui  |
-| ROS Communication | roslibjs via rosbridge   |
-| Build Tool        | Vite                     |
-| Icons             | Lucide React             |
-| Notifications     | Sonner                   |
+| Category          | Stack                                               |
+| :---------------- | :-------------------------------------------------- |
+| Framework         | React 18 + TypeScript                               |
+| Build Tool        | Vite                                                |
+| State Management  | Zustand (client state) + React Query (server state) |
+| ROS Communication | roslib.js via WebSocket                             |
+| UI Components     | shadcn/ui + Tailwind CSS                            |
 
 ## Prerequisites
 
@@ -108,23 +103,29 @@ This project (React WebApp + ROS2 workspace) serves as the foundation for wareho
 
 ```
 src/
-├── components/           # React UI components
-│   ├── ui/              # shadcn/ui base components
-│   ├── ControlButtons.tsx    # Directional pad
-│   ├── SpeedControl.tsx      # Speed mode selector
-│   ├── StatusDisplay.tsx     # Telemetry display
-│   └── PositionManager.tsx   # Waypoint management
-├── hooks/               # React custom hooks
-│   ├── useRos.ts            # Connection state management
-│   ├── useRobot.ts          # Robot control logic
-│   └── usePosition.ts       # Waypoint state management
-├── services/            # ROS communication layer
-│   ├── ros2Connection.ts    # WebSocket connection singleton
-│   └── positionService.ts   # Position-related ROS calls
-├── config.ts            # Robot IPs and ROS configuration
-├── types.ts             # TypeScript type definitions
-├── App.tsx              # Main application component
-└── main.tsx             # Application entry point
+├── components/                 # UI components
+│
+├── hooks/
+│   ├── useRobot.ts             # Robot connection + control (movement, speed, connect/disconnect)
+│   ├── useOdometry.ts          # Subscribe to odometry data
+│   └── usePositions.ts         # React Query hooks for position CRUD
+│
+├── stores/
+│   ├── connectionStore.ts      # WebSocket connection state
+│   ├── selectionStore.ts       # Position selection state
+│   └── navigationStore.ts      # Navigation state
+│
+├── services/
+│   ├── ros2Connection.ts       # Singleton ROS WebSocket service
+│   └── positionService.ts      # Position management service calls
+│
+├── constants/
+├── utils/
+│
+├── config.ts                   # Robot IPs, ports, default settings
+├── types.ts                    # TypeScript type definitions
+├── App.tsx                     # Main application component
+└── main.tsx                    # Entry point
 ```
 
 ## Usage

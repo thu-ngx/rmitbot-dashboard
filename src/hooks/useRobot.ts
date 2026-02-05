@@ -1,22 +1,55 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useRos } from "./useRos";
 import { rosService } from "@/services/ros2Connection";
+import { useConnectionStore } from "@/stores/connectionStore";
 import { ROS_CONFIG } from "@/config";
 import { calculateVelocity } from "@/utils/motion";
 import type { SpeedMode } from "@/types";
 
 export function useRobot() {
-  const { status, isConnected, connect, disconnect, switchRobot, currentIp } =
-    useRos();
+  // Connection state
+  const status = useConnectionStore((state) => state.status);
+  const currentIp = useConnectionStore((state) => state.currentIp);
+  const setStatus = useConnectionStore((state) => state.setStatus);
 
+  const isConnected = status === "CONNECTED";
+
+  // Movement state
   const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
-  const [speed, setSpeed] = useState(0);
 
+  // Refs for continuous publishing
   const publishIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
-    null,
+    null
   );
   const currentVelocityRef = useRef({ x: 0, y: 0, z: 0 });
 
+  // Connection actions
+  const connect = useCallback(() => {
+    setStatus("CONNECTING");
+    rosService.connect();
+  }, [setStatus]);
+
+  const disconnect = useCallback(() => {
+    rosService.disconnect();
+  }, []);
+
+  const switchRobot = useCallback(
+    (newIp: string) => {
+      if (newIp === currentIp) return;
+      setStatus("CONNECTING");
+      rosService.switchRobot(newIp);
+    },
+    [currentIp, setStatus]
+  );
+
+  const toggleConnection = useCallback(() => {
+    if (isConnected) {
+      disconnect();
+    } else {
+      connect();
+    }
+  }, [isConnected, connect, disconnect]);
+
+  // Movement actions
   const stopPublishing = useCallback(() => {
     if (publishIntervalRef.current) {
       clearInterval(publishIntervalRef.current);
@@ -24,7 +57,6 @@ export function useRobot() {
     }
     currentVelocityRef.current = { x: 0, y: 0, z: 0 };
     rosService.publishVelocity(0, 0, 0);
-    setSpeed(0);
   }, []);
 
   const move = useCallback(
@@ -43,7 +75,6 @@ export function useRobot() {
 
       const velocity = calculateVelocity({ x, y, z }, speedMode);
       currentVelocityRef.current = velocity;
-      setSpeed(Math.hypot(velocity.x, velocity.y));
 
       // Start continuous publishing if not already
       if (!publishIntervalRef.current) {
@@ -57,7 +88,7 @@ export function useRobot() {
         rosService.publishVelocity(velocity.x, velocity.y, velocity.z);
       }
     },
-    [isConnected, speedMode, stopPublishing],
+    [isConnected, speedMode, stopPublishing]
   );
 
   // Cleanup on unmount
@@ -70,23 +101,16 @@ export function useRobot() {
     };
   }, []);
 
-  const toggleConnection = useCallback(() => {
-    if (isConnected) {
-      disconnect();
-    } else {
-      connect();
-    }
-  }, [isConnected, connect, disconnect]);
-
   return {
+    // Connection
     status,
     isConnected,
     currentIp,
-    speed,
     toggleConnection,
+    switchRobot,
+    // Movement
     move,
     speedMode,
     setSpeedMode,
-    switchRobot,
   };
 }
