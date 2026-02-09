@@ -1,70 +1,120 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
 import { toast } from "sonner";
+import { useRosConnection } from "@/hooks/useRosConnection";
 import { positionService } from "@/services/positionService";
-import { useSelectionStore } from "@/stores/selectionStore";
+import type { SavedPosition } from "@/types";
 
-const POSITIONS_QUERY_KEY = ["positions"] as const;
-
-/**
- * Query hook for fetching positions
- */
 export function usePositions(isConnected: boolean) {
-  return useQuery({
-    queryKey: POSITIONS_QUERY_KEY,
-    queryFn: () => positionService.getPositions(),
-    enabled: isConnected,
-    staleTime: 30_000, // Consider fresh for 30 seconds
-    retry: 2,
-    retryDelay: 1000,
-  });
-}
+  const { ros } = useRosConnection();
 
-/**
- * Mutation hook for saving a new position
- */
-export function useSavePosition() {
-  const queryClient = useQueryClient();
+  // State for positions list
+  const [positions, setPositions] = useState<SavedPosition[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
-  return useMutation({
-    mutationFn: (name: string) => positionService.savePosition(name),
-    onSuccess: (result, name) => {
+  // State for saving
+  const [isSaving, setIsSaving] = useState(false);
+
+  // State for deleting
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [deletingName, setDeletingName] = useState<string | null>(null);
+
+  // Fetch positions on mount/connection
+  useEffect(() => {
+    if (!isConnected) {
+      setPositions([]);
+      return;
+    }
+
+    setIsLoading(true);
+    positionService
+      .getPositions(ros)
+      .then(setPositions)
+      .catch((err) => {
+        setError(err);
+        console.error("[usePositions] Failed to fetch:", err);
+      })
+      .finally(() => setIsLoading(false));
+  }, [isConnected, ros]);
+
+  const refetch = async () => {
+    if (!isConnected) return;
+
+    setIsLoading(true);
+    try {
+      const data = await positionService.getPositions(ros);
+      setPositions(data);
+      setError(null);
+    } catch (err) {
+      setError(err as Error);
+      console.error("[usePositions] Refetch failed:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const addPosition = (position: SavedPosition) => {
+    setPositions((prev) => [...prev, position]);
+  };
+
+  const removePosition = (name: string) => {
+    setPositions((prev) => prev.filter((p) => p.name !== name));
+  };
+
+  const savePosition = async (name: string) => {
+    setIsSaving(true);
+    try {
+      const result = await positionService.savePosition(ros, name);
       if (result.success) {
         toast.success(`Position "${name}" saved`);
-        queryClient.invalidateQueries({ queryKey: POSITIONS_QUERY_KEY });
+        if (result.position) {
+          addPosition(result.position);
+        }
       } else {
         toast.error(result.message || "Failed to save position");
       }
-    },
-    onError: (error: Error) => {
-      console.error("Error saving position:", error);
-      toast.error(error.message || "Error saving position");
-    },
-  });
-}
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error saving position";
+      console.error("[usePositions] savePosition error:", error);
+      toast.error(message);
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-/**
- * Mutation hook for deleting a position
- */
-export function useDeletePosition() {
-  const queryClient = useQueryClient();
-  const removeFromSelection = useSelectionStore(
-    (state) => state.removeFromSelection,
-  );
+  const deletePosition = async (name: string) => {
+    setIsDeleting(true);
+    setDeletingName(name);
 
-  return useMutation({
-    mutationFn: (name: string) => positionService.deletePosition(name),
-    onSuccess: (success, name) => {
+    try {
+      const success = await positionService.deletePosition(ros, name);
       if (success) {
         toast.success(`Position "${name}" deleted`);
-        removeFromSelection(name);
-        queryClient.invalidateQueries({ queryKey: POSITIONS_QUERY_KEY });
+        removePosition(name);
       } else {
         toast.error("Failed to delete position");
       }
-    },
-    onError: (error: Error) => {
-      console.error("Error deleting position:", error);
-      toast.error(error.message || "Error deleting position");
-    },
-  });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Error deleting position";
+      console.error("[usePositions] deletePosition error:", error);
+      toast.error(message);
+    } finally {
+      setIsDeleting(false);
+      setDeletingName(null);
+    }
+  };
+
+  return {
+    positions,
+    isLoading,
+    error,
+    isSaving,
+    isDeleting,
+    deletingName,
+    refetch,
+    savePosition,
+    deletePosition,
+  };
 }

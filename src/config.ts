@@ -8,13 +8,11 @@ export const ROBOT_OPTIONS = [
   { ip: "100.91.20.95", name: "Loc" },
 ] as const;
 
-const DEFAULT_ROBOT_IP = ROBOT_OPTIONS[0].ip;
-
 export const ROS_CONFIG = {
-  DEFAULT_IP: DEFAULT_ROBOT_IP,
+  DEFAULT_IP: ROBOT_OPTIONS[0].ip,
   ROSBRIDGE_PORT,
-  RECONNECT_INTERVAL: 3000,
-  SPEED: 0.5,
-  TURN: 1.0,
-  PUBLISH_RATE: 10,
+  RECONNECT_INTERVAL: 3000, // ms between reconnection attempts
+  SPEED: 0.5, // Base linear speed (m/s)
+  TURN: 1.0, // Base angular speed (rad/s)
+  PUBLISH_RATE: 10, // Velocity publish rate (Hz)
 };

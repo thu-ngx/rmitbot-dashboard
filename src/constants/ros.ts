@@ -1,8 +1,9 @@
+import { ROS_CONFIG } from "@/config";
+
 export const ROS_TOPICS = {
   CMD_VEL: "/cmd_vel_keyboard",
   ODOM: "/odom_ekf",
   NAVIGATION_STATUS: "/navigation_web_status",
-  POSITION_MARKERS: "/position_markers",
 } as const;
 
 export const ROS_SERVICES = {
@@ -42,8 +43,24 @@ export const MOVEMENT_COMMANDS: Record<string, [number, number, number]> = {
   "rotate-right": [0, 0, -1.0],
 } as const;
 
-export const SPEED_MULTIPLIERS: Record<string, number> = {
+const SPEED_MULTIPLIERS = {
   eco: 0.6,
   normal: 1.0,
   fast: 1.6,
+} as const;
+
+
+export const SPEED_PROFILES = {
+  eco: {
+    linear: ROS_CONFIG.SPEED * SPEED_MULTIPLIERS.eco,
+    angular: ROS_CONFIG.TURN * SPEED_MULTIPLIERS.eco,
+  },
+  normal: {
+    linear: ROS_CONFIG.SPEED * SPEED_MULTIPLIERS.normal,
+    angular: ROS_CONFIG.TURN * SPEED_MULTIPLIERS.normal,
+  },
+  fast: {
+    linear: ROS_CONFIG.SPEED * SPEED_MULTIPLIERS.fast,
+    angular: ROS_CONFIG.TURN * SPEED_MULTIPLIERS.fast,
+  },
 } as const;

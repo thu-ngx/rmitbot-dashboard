@@ -1,12 +1,17 @@
 import * as ROSLIB from "roslib";
-import { rosService } from "./ros2Connection";
+import {
+  ROS_SERVICES,
+  ROS_SERVICE_TYPES,
+  SERVICE_TIMEOUT_MS,
+  ROS_TOPICS,
+  ROS_MESSAGE_TYPES,
+} from "@/constants/ros";
 import type { SavedPosition } from "@/types";
-import { ROS_SERVICES, ROS_SERVICE_TYPES, SERVICE_TIMEOUT_MS } from "@/constants/ros";
 
-// Response types
 interface SavePositionResponse {
   success: boolean;
   message: string;
+  position?: SavedPosition;
 }
 
 interface GetPositionsResponse {
@@ -27,36 +32,19 @@ interface NavigateMultiResponse {
 }
 
 class PositionService {
-  private static instance: PositionService;
-
-  private constructor() {}
-
-  public static getInstance(): PositionService {
-    if (!PositionService.instance) {
-      PositionService.instance = new PositionService();
-    }
-    return PositionService.instance;
-  }
-
   /**
    * Generic service call wrapper with timeout
    */
-  private callService<TRequest, TResponse>(
+  callService<TRequest, TResponse>(
+    ros: ROSLIB.Ros,
     serviceName: string,
     serviceType: string,
     request: TRequest,
     timeoutMs = SERVICE_TIMEOUT_MS,
   ): Promise<TResponse> {
     return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
-
-      if (!rosService.isConnected) {
-        reject(new Error("ROS not connected"));
-        return;
-      }
-
       const service = new ROSLIB.Service({
-        ros,
+        ros, // Use passed ros instance
         name: serviceName,
         serviceType,
       });
@@ -88,71 +76,105 @@ class PositionService {
    * Save current robot position with a name
    */
   async savePosition(
+    ros: ROSLIB.Ros,
     name: string,
-  ): Promise<{ success: boolean; message: string }> {
-    console.log(`Saving position: ${name}`);
+  ): Promise<{ success: boolean; message: string; position?: SavedPosition }> {
+    console.log(`[savePosition] Saving: ${name}`);
 
-    const response = await this.callService<
-      { name: string },
-      SavePositionResponse
-    >(ROS_SERVICES.SAVE_POSITION, ROS_SERVICE_TYPES.SAVE_POSITION, { name });
+    try {
+      const response = await this.callService<
+        { name: string },
+        SavePositionResponse
+      >(ros, ROS_SERVICES.SAVE_POSITION, ROS_SERVICE_TYPES.SAVE_POSITION, {
+        name,
+      });
 
-    console.log("Save response:", response);
-    return {
-      success: response.success,
-      message: response.message || "Unknown response",
-    };
+      console.log("[savePosition] Response:", response);
+
+      if (response.success) {
+        try {
+          const positions = await this.getPositions(ros);
+          const savedPosition = positions.find((p) => p.name === name);
+          return {
+            success: true,
+            message: response.message || "Position saved",
+            position: savedPosition,
+          };
+        } catch (err) {
+          console.error("[savePosition] Failed to fetch saved position:", err);
+        }
+      }
+
+      return {
+        success: response.success,
+        message: response.message || "Unknown response",
+      };
+    } catch (error) {
+      console.error("[savePosition] Error:", error);
+      throw error;
+    }
   }
 
   /**
    * Get all saved positions
    */
-  async getPositions(): Promise<SavedPosition[]> {
-    console.log("Getting positions...");
+  async getPositions(ros: ROSLIB.Ros): Promise<SavedPosition[]> {
+    console.log("[getPositions] Fetching positions...");
 
-    const response = await this.callService<
-      Record<string, never>,
-      GetPositionsResponse
-    >(ROS_SERVICES.GET_POSITIONS, ROS_SERVICE_TYPES.GET_POSITIONS, {});
+    try {
+      const response = await this.callService<
+        Record<string, never>,
+        GetPositionsResponse
+      >(ros, ROS_SERVICES.GET_POSITIONS, ROS_SERVICE_TYPES.GET_POSITIONS, {});
 
-    console.log("Get positions response:", response);
+      console.log("[getPositions] Response:", response);
 
-    const names = response.names || [];
-    const xCoords = response.x_coords || [];
-    const yCoords = response.y_coords || [];
-    const thetaCoords = response.theta_coords || [];
+      const names = response.names || [];
+      const xCoords = response.x_coords || [];
+      const yCoords = response.y_coords || [];
+      const thetaCoords = response.theta_coords || [];
 
-    return names.map((name, index) => ({
-      id: `pos-${index}`,
-      name,
-      x: xCoords[index] || 0,
-      y: yCoords[index] || 0,
-      theta: thetaCoords[index] || 0,
-      timestamp: Date.now(),
-    }));
+      return names.map((name, index) => ({
+        id: `pos-${index}`,
+        name,
+        x: xCoords[index] || 0,
+        y: yCoords[index] || 0,
+        theta: thetaCoords[index] || 0,
+        timestamp: Date.now(),
+      }));
+    } catch (error) {
+      console.error("[getPositions] Error:", error);
+      throw error;
+    }
   }
 
   /**
    * Delete a position by name
    */
-  async deletePosition(name: string): Promise<boolean> {
-    console.log(`Deleting position: ${name}`);
+  async deletePosition(ros: ROSLIB.Ros, name: string): Promise<boolean> {
+    console.log(`[deletePosition] Deleting: ${name}`);
 
-    const response = await this.callService<
-      { name: string },
-      DeletePositionResponse
-    >(ROS_SERVICES.DELETE_POSITION, ROS_SERVICE_TYPES.DELETE_POSITION, {
-      name,
-    });
+    try {
+      const response = await this.callService<
+        { name: string },
+        DeletePositionResponse
+      >(ros, ROS_SERVICES.DELETE_POSITION, ROS_SERVICE_TYPES.DELETE_POSITION, {
+        name,
+      });
 
-    console.log("Delete response:", response);
-    return response.success;
+      console.log("[deletePosition] Response:", response);
+      return response.success;
+    } catch (error) {
+      console.error("[deletePosition] Error:", error);
+      throw error;
+    }
   }
 
   /**
    * Navigate through multiple positions
    */
   async navigateThroughPositions(
+    ros: ROSLIB.Ros,
     names: string[],
     onFeedback?: (status: string) => void,
   ): Promise<{
@@ -161,20 +183,13 @@ class PositionService {
     positions_reached?: number;
   }> {
     return new Promise((resolve, reject) => {
-      const ros = rosService.getROS();
-
-      if (!rosService.isConnected) {
-        reject(new Error("ROS not connected"));
-        return;
-      }
-
-      console.log(`Starting multi-navigation: ${names.join(", ")}`);
+      console.log(`[navigateThroughPositions] Starting: ${names.join(", ")}`);
 
       // Setup feedback listener
       const feedbackTopic = new ROSLIB.Topic({
         ros,
-        name: "/navigation_web_status",
-        messageType: "std_msgs/String",
+        name: ROS_TOPICS.NAVIGATION_STATUS,
+        messageType: ROS_MESSAGE_TYPES.STRING,
       });
 
       const cleanup = () => {
@@ -194,7 +209,10 @@ class PositionService {
           data.includes("Error:") ||
           data.includes("Navigation failed")
         ) {
-          console.log("Error during multi-navigation");
+          console.error(
+            "[navigateThroughPositions] Error in navigation:",
+            data,
+          );
         }
       };
 
@@ -202,6 +220,7 @@ class PositionService {
 
       // Call the service to start navigation
       this.callService<{ names: string[] }, NavigateMultiResponse>(
+        ros,
         ROS_SERVICES.NAVIGATE_MULTI,
         ROS_SERVICE_TYPES.NAVIGATE_MULTI,
         { names },
@@ -211,10 +230,14 @@ class PositionService {
             cleanup();
             resolve({ success: false, message: response.message });
           } else {
-            console.log("Multi-navigation background task started...");
+            console.log("[navigateThroughPositions] Background task started");
           }
         })
         .catch((error) => {
+          console.error(
+            "[navigateThroughPositions] Service call failed:",
+            error,
+          );
           cleanup();
           reject(error);
         });
@@ -224,24 +247,21 @@ class PositionService {
   /**
    * Cancel ongoing navigation
    */
-  cancelNavigation(): void {
-    console.log("Cancelling navigation...");
-    const ros = rosService.getROS();
-    if (rosService.isConnected) {
-      const service = new ROSLIB.Service({
-        ros,
-        name: "/cancel_navigation",
-        serviceType: "std_srvs/Trigger",
-      });
-      service.callService(
-        {},
-        (res) => {
-          console.log("Cancelled", res);
-        },
-        (err) => console.error(err),
-      );
-    }
+  cancelNavigation(ros: ROSLIB.Ros): void {
+    console.log("[cancelNavigation] Cancelling...");
+    const service = new ROSLIB.Service({
+      ros,
+      name: "/cancel_navigation",
+      serviceType: "std_srvs/Trigger",
+    });
+    service.callService(
+      {},
+      (res) => {
+        console.log("[cancelNavigation] Cancelled:", res);
+      },
+      (err) => console.error("[cancelNavigation] Error:", err),
+    );
   }
 }
 
-export const positionService = PositionService.getInstance();
+export const positionService = new PositionService();

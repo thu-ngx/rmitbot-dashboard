@@ -1,22 +1,32 @@
-import { useEffect, useState } from "react";
-import { rosService } from "@/services/ros2Connection";
+import { useState, useEffect } from "react";
+import * as ROSLIB from "roslib";
+import { useRosConnection } from "@/hooks/useRosConnection";
 import { quaternionToYaw } from "@/utils/quaternion";
+import { ROS_TOPICS, ROS_MESSAGE_TYPES } from "@/constants/ros";
 import type { RobotPose, OdometryMessage } from "@/types";
 
 const DEFAULT_POSE: RobotPose = { x: 0, y: 0, theta: 0 };
 
-export function useOdometry(isConnected: boolean) {
+export function useOdometry() {
+  const { ros, isConnected } = useRosConnection();
   const [pose, setPose] = useState<RobotPose>(DEFAULT_POSE);
   const [speed, setSpeed] = useState(0);
 
   useEffect(() => {
     if (!isConnected) {
-      // Clear the callback when disconnected
-      rosService.setOdomCallback(() => {});
+      setPose(DEFAULT_POSE);
+      setSpeed(0);
       return;
     }
 
-    rosService.setOdomCallback((data: OdometryMessage) => {
+    const odomTopic = new ROSLIB.Topic({
+      ros,
+      name: ROS_TOPICS.ODOM,
+      messageType: ROS_MESSAGE_TYPES.ODOMETRY,
+    });
+
+    const handleMessage = (message: unknown) => {
+      const data = message as OdometryMessage;
       const position = data?.pose?.pose?.position;
       const orientation = data?.pose?.pose?.orientation;
 
@@ -31,19 +41,16 @@ export function useOdometry(isConnected: boolean) {
           setSpeed(Math.hypot(linear.x, linear.y));
         }
       } catch (error) {
-        console.error("Error processing odometry:", error);
+        console.error("[useOdometry] Error processing odometry:", error);
       }
-    });
-
-    // Cleanup on unmount or when isConnected changes
-    return () => {
-      rosService.setOdomCallback(() => {});
     };
-  }, [isConnected]);
 
-  // Reset values when disconnected (outside useEffect)
-  const displayPose = isConnected ? pose : DEFAULT_POSE;
-  const displaySpeed = isConnected ? speed : 0;
+    odomTopic.subscribe(handleMessage);
 
-  return { pose: displayPose, speed: displaySpeed };
+    return () => {
+      odomTopic.unsubscribe(handleMessage);
+    };
+  }, [ros, isConnected]);
+
+  return { pose, speed };
 }
