@@ -1,6 +1,8 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { useState } from "react";
 import { Toaster, toast } from "sonner";
 
+import { RosProvider } from "@/contexts/RosContext";
+import { useRosConnection } from "@/hooks/useRosConnection";
 import { Header } from "@/components/Header";
 import { PositionManager } from "@/components/position/PositionManager";
 import { ControlButtons } from "@/components/control/ControlButtons";
@@ -9,29 +11,26 @@ import { StatusDisplay } from "@/components/StatusDisplay";
 import { QuickStartCard } from "@/components/QuickStartCard";
 import { Card } from "@/components/ui/card";
 
-import { useRobot } from "@/hooks/useRobot";
+import { useRobotControl } from "@/hooks/useRobotControl";
 import { MOVEMENT_COMMANDS } from "@/constants/ros";
-
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      refetchOnWindowFocus: false,
-    },
-  },
-});
+import type { SpeedMode } from "@/types";
 
 function AppContent() {
-  const robot = useRobot();
+  const [speedMode, setSpeedMode] = useState<SpeedMode>("normal");
+
+  const { isConnected, currentIp, connect, disconnect, switchRobot } =
+    useRosConnection();
+  const { move } = useRobotControl(speedMode);
 
   const handleCommand = (cmd: string) => {
-    if (!robot.isConnected) {
+    if (!isConnected) {
       toast.error("Robot Offline");
       return;
     }
 
     const velocity = MOVEMENT_COMMANDS[cmd];
     if (velocity) {
-      robot.move(...velocity);
+      move(...velocity);
     }
   };
 
@@ -40,32 +39,29 @@ function AppContent() {
       <Toaster theme="dark" />
 
       <Header
-        status={robot.status}
-        currentIp={robot.currentIp}
-        isConnected={robot.isConnected}
-        onSwitchRobot={robot.switchRobot}
-        onToggleConnection={robot.toggleConnection}
+        isConnected={isConnected}
+        currentIp={currentIp}
+        onSwitchRobot={switchRobot}
+        onToggleConnection={isConnected ? disconnect : connect}
       />
 
       <main className="container mx-auto px-4 py-4 max-w-7xl">
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-[calc(100vh-120px)]">
-          {/* Left Column: Position Manager */}
           <div className="lg:col-span-8">
-            <PositionManager isConnected={robot.isConnected} />
+            <PositionManager isConnected={isConnected} />
           </div>
 
-          {/* Right Column: Status + Controls */}
           <div className="lg:col-span-4 flex flex-col gap-4">
-            <StatusDisplay isConnected={robot.isConnected} />
+            <StatusDisplay />
 
             <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm p-4">
               <h2 className="text-sm font-semibold mb-3 text-white">
                 Speed Control
               </h2>
               <SpeedControl
-                selectedMode={robot.speedMode}
-                onModeChange={robot.setSpeedMode}
-                disabled={false}
+                selectedMode={speedMode}
+                onModeChange={setSpeedMode}
+                disabled={!isConnected}
               />
 
               <div className="mt-4">
@@ -74,7 +70,7 @@ function AppContent() {
                 </h2>
                 <ControlButtons
                   onCommand={handleCommand}
-                  disabled={!robot.isConnected}
+                  disabled={!isConnected}
                 />
               </div>
             </Card>
@@ -89,8 +85,8 @@ function AppContent() {
 
 export default function App() {
   return (
-    <QueryClientProvider client={queryClient}>
+    <RosProvider>
       <AppContent />
-    </QueryClientProvider>
+    </RosProvider>
   );
 }

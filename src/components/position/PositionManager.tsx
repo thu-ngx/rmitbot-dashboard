@@ -8,52 +8,48 @@ import { PositionList } from "./PositionList";
 import { SavePositionForm } from "./SavePositionForm";
 import { NavigationControls } from "./NavigationControls";
 
-import {
-  usePositions,
-  useSavePosition,
-  useDeletePosition,
-} from "@/hooks/usePositions";
-import { useSelectionStore } from "@/stores/selectionStore";
-import { useNavigationStore } from "@/stores/navigationStore";
+import { usePositions } from "@/hooks/usePositions";
+import { useNavigationQueue } from "@/hooks/useNavigationQueue";
+import { useNavigationControl } from "@/hooks/useNavigationControl";
 
 interface PositionManagerProps {
   isConnected: boolean;
 }
 
 export function PositionManager({ isConnected }: PositionManagerProps) {
-  // React Query
   const {
-    data: positions = [],
+    positions,
     isLoading,
+    isSaving,
+    deletingName,
     refetch,
+    savePosition,
+    deletePosition,
   } = usePositions(isConnected);
-  const savePositionMutation = useSavePosition();
-  const deletePositionMutation = useDeletePosition();
 
-  // Zustand stores
-  const { selectedPositions, selectedOrder, toggleSelection, clearSelection } =
-    useSelectionStore();
-  const {
-    isNavigating,
-    currentIndex,
-    status: navigationStatus,
-    startNavigation,
-    cancelNavigation,
-  } = useNavigationStore();
+  const selection = useNavigationQueue();
+  const navigation = useNavigationControl();
+
+  const handleSave = async (name: string) => {
+    await savePosition(name);
+  };
+
+  const handleDelete = async (name: string) => {
+    await deletePosition(name);
+    selection.removeFromSelection(name);
+  };
 
   const handleNavigate = async () => {
-    if (selectedOrder.length === 0) {
+    if (selection.selectedOrder.length === 0) {
       toast.error("No positions selected");
       return;
     }
 
     try {
-      toast.info(`Navigating through ${selectedOrder.length} positions...`);
-      await startNavigation(selectedOrder);
-      toast.success("Navigation completed!");
-      clearSelection();
+      await navigation.startNavigation(selection.selectedOrder);
+      selection.clearSelection();
     } catch {
-      toast.error("Navigation failed");
+      // Error already handled in useNavigationControl
     }
   };
 
@@ -90,33 +86,29 @@ export function PositionManager({ isConnected }: PositionManagerProps) {
       <CardContent className="flex-1 flex flex-col gap-3 overflow-hidden">
         <SavePositionForm
           disabled={!isConnected}
-          isSaving={savePositionMutation.isPending}
-          onSave={savePositionMutation.mutate}
+          isSaving={isSaving}
+          onSave={handleSave}
         />
 
         <NavigationControls
-          selectedCount={selectedPositions.size}
-          isNavigating={isNavigating}
+          selectedCount={selection.selectedPositions.size}
+          isNavigating={navigation.isNavigating}
           isConnected={isConnected}
-          navigationStatus={navigationStatus}
+          navigationStatus={navigation.status}
           onNavigate={handleNavigate}
-          onCancel={cancelNavigation}
+          onCancel={navigation.cancelNavigation}
         />
 
         <PositionList
           positions={positions}
-          selectedPositions={selectedPositions}
-          selectedOrder={selectedOrder}
-          currentNavigatingIndex={currentIndex}
-          isNavigating={isNavigating}
+          selectedPositions={selection.selectedPositions}
+          selectedOrder={selection.selectedOrder}
+          currentNavigatingIndex={navigation.currentIndex}
+          isNavigating={navigation.isNavigating}
           isConnected={isConnected}
-          deletingName={
-            deletePositionMutation.isPending
-              ? (deletePositionMutation.variables ?? null)
-              : null
-          }
-          onToggleSelect={toggleSelection}
-          onDelete={deletePositionMutation.mutate}
+          deletingName={deletingName}
+          onToggleSelect={selection.toggleSelection}
+          onDelete={handleDelete}
         />
       </CardContent>
     </Card>

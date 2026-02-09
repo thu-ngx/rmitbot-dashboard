@@ -8,32 +8,22 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { ROBOT_OPTIONS } from "@/config";
-import type { ConnectionStatus } from "@/types";
-
-const STATUS_CONFIG: Record<ConnectionStatus, { color: string; text: string }> =
-  {
-    CONNECTED: { color: "text-green-400", text: "ONLINE" },
-    CONNECTING: { color: "text-yellow-400", text: "CONNECTING..." },
-    ERROR: { color: "text-red-500", text: "ERROR" },
-    DISCONNECTED: { color: "text-slate-600", text: "OFFLINE" },
-  };
 
 interface HeaderProps {
-  status: ConnectionStatus;
-  currentIp: string;
   isConnected: boolean;
+  currentIp: string;
   onSwitchRobot: (ip: string) => void;
   onToggleConnection: () => void;
 }
 
 export function Header({
-  status,
-  currentIp,
   isConnected,
+  currentIp,
   onSwitchRobot,
   onToggleConnection,
 }: HeaderProps) {
-  const { color, text } = STATUS_CONFIG[status] ?? STATUS_CONFIG.DISCONNECTED;
+  const statusColor = isConnected ? "text-green-400" : "text-slate-600";
+  const statusText = isConnected ? "ONLINE" : "OFFLINE";
 
   return (
     <header className="border-b border-slate-800/50 bg-slate-900/30 backdrop-blur-sm sticky top-0 z-10">
@@ -59,9 +49,9 @@ export function Header({
 
         {/* Right: Connection Status and Toggle */}
         <div className="flex items-center gap-2">
-          <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${color}`} />
-          <span className={`text-[10px] md:text-xs font-bold ${color}`}>
-            {text}
+          <Wifi className={`w-3 h-3 md:w-4 md:h-4 ${statusColor}`} />
+          <span className={`text-[10px] md:text-xs font-bold ${statusColor}`}>
+            {statusText}
           </span>
           <Switch checked={isConnected} onCheckedChange={onToggleConnection} />
         </div>

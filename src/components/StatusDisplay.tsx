@@ -3,12 +3,8 @@ import { Gauge, MapPin } from "lucide-react";
 import { useOdometry } from "@/hooks/useOdometry";
 import { radiansToDegrees } from "@/utils/quaternion";
 
-interface StatusDisplayProps {
-  isConnected: boolean;
-}
-
-export function StatusDisplay({ isConnected }: StatusDisplayProps) {
-  const { pose, speed } = useOdometry(isConnected);
+export function StatusDisplay() {
+  const { pose, speed } = useOdometry();
 
   return (
     <Card className="bg-slate-900/50 border-slate-700/50 backdrop-blur-sm">
