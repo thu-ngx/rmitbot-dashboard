@@ -18,43 +18,46 @@ This project (React WebApp + ROS2 workspace) serves as the foundation for wareho
 - **Real-time Telemetry**: Live display of robot position, orientation, and speed
 - **Multi-Robot Support**: Switch between different robots via dropdown selector
 
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                        React Components                         │
-│  (App, Header, PositionManager, ControlButtons, StatusDisplay)  │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ uses
-┌─────────────────────────▼───────────────────────────────────────┐
-│                         Custom Hooks                            │
-│             (useRobot, useOdometry, usePositions)               │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ reads/writes
-┌─────────────────────────▼───────────────────────────────────────┐
-│                       Zustand Stores                            │
-│       (connectionStore, selectionStore, navigationStore)        │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ interacts with
-┌─────────────────────────▼───────────────────────────────────────┐
-│                         Services                                │
-│                 (rosService, positionService)                   │
-└─────────────────────────┬───────────────────────────────────────┘
-                          │ WebSocket (port 9090)
-┌─────────────────────────▼───────────────────────────────────────┐
-│                    ROS2 (via rosbridge)                         │
-└─────────────────────────────────────────────────────────────────┘
-```
-
 ## Tech Stack
 
-| Category          | Stack                                               |
-| :---------------- | :-------------------------------------------------- |
-| Framework         | React 18 + TypeScript                               |
-| Build Tool        | Vite                                                |
-| State Management  | Zustand (client state) + React Query (server state) |
-| ROS Communication | roslib.js via WebSocket                             |
-| UI Components     | shadcn/ui + Tailwind CSS                            |
+| Category          | Stack                    |
+| :---------------- | :----------------------- |
+| Framework         | React + TypeScript       |
+| Build Tool        | Vite                     |
+| State Management  | Context API              |
+| ROS Communication | roslib.js via WebSocket  |
+| UI Components     | shadcn/ui + Tailwind CSS |
+
+## Project Structure
+
+```
+src/
+├── components/                 # UI components
+│
+├── contexts/
+│   └── RosContext.tsx          # ROS connection context provider
+│
+├── hooks/
+│   ├── useRosConnection.ts      # Access ROS connection state from context
+│   ├── useRobotControl.ts       # Publish velocity commands for robot movement
+│   ├── useOdometry.ts           # Subscribe to odometry data (pose, speed)
+│   ├── usePositions.ts          # Manage saved positions (fetch, save, delete)
+│   ├── useNavigationControl.ts  # Control navigation execution (start, cancel, status)
+│   └── useNavigationQueue.ts    # Manage navigation queue (position selection, ordering)
+│
+├── services/
+│   └── positionService.ts      # Position management service calls
+│
+├── constants/
+│   └── ros.ts                  # ROS topics, services, message types, movement commands
+│
+├── utils/
+│
+├── config.ts                   # Robot IPs, ports, default settings
+├── types.ts                    # TypeScript type definitions
+├── App.tsx                     # Main application component
+└── main.tsx                    # Entry point
+```
 
 ## Prerequisites
 
@@ -98,35 +101,6 @@ This project (React WebApp + ROS2 workspace) serves as the foundation for wareho
 5. **Access the dashboard**
 
    Open `http://localhost:5173` in your browser.
-
-## Project Structure
-
-```
-src/
-├── components/                 # UI components
-│
-├── hooks/
-│   ├── useRobot.ts             # Robot connection + control (movement, speed, connect/disconnect)
-│   ├── useOdometry.ts          # Subscribe to odometry data
-│   └── usePositions.ts         # React Query hooks for position CRUD
-│
-├── stores/
-│   ├── connectionStore.ts      # WebSocket connection state
-│   ├── selectionStore.ts       # Position selection state
-│   └── navigationStore.ts      # Navigation state
-│
-├── services/
-│   ├── ros2Connection.ts       # Singleton ROS WebSocket service
-│   └── positionService.ts      # Position management service calls
-│
-├── constants/
-├── utils/
-│
-├── config.ts                   # Robot IPs, ports, default settings
-├── types.ts                    # TypeScript type definitions
-├── App.tsx                     # Main application component
-└── main.tsx                    # Entry point
-```
 
 ## Usage
 
